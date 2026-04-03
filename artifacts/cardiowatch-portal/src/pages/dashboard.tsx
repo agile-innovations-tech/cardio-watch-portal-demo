@@ -1,26 +1,40 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Search, Filter, AlertTriangle, Activity, CheckCircle, Clock } from 'lucide-react';
+import { Search, Filter, AlertTriangle, Activity, CheckCircle, Clock, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { patients } from '@/data/patients';
-import { Patient, Severity, PatientStatus } from '@/types';
+import { Patient, PatientStatus } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+
+type SortColumn = 'name' | 'age' | 'unreviewedCritical' | 'unreviewedModerate' | 'lastReviewed' | 'complianceRate' | 'batteryPct';
+type SortDirection = 'asc' | 'desc';
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('unreviewedCritical');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Stats
   const totalPatients = patients.length;
   const criticalUnreviewed = patients.reduce((acc, p) => acc + p.unreviewedCritical, 0);
   const moderateUnreviewed = patients.reduce((acc, p) => acc + p.unreviewedModerate, 0);
   const avgCompliance = Math.round(patients.reduce((acc, p) => acc + p.complianceRate, 0) / totalPatients);
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
 
   const filteredPatients = useMemo(() => {
     let filtered = [...patients];
@@ -42,16 +56,29 @@ export default function Dashboard() {
       filtered = filtered.filter(p => p.status === statusFilter);
     }
 
-    // Default sort: critical events descending
     filtered.sort((a, b) => {
-      if (b.unreviewedCritical !== a.unreviewedCritical) {
-        return b.unreviewedCritical - a.unreviewedCritical;
+      let aVal: number | string;
+      let bVal: number | string;
+      switch (sortColumn) {
+        case 'name': aVal = a.name; bVal = b.name; break;
+        case 'age': aVal = a.age; bVal = b.age; break;
+        case 'unreviewedCritical': aVal = a.unreviewedCritical; bVal = b.unreviewedCritical; break;
+        case 'unreviewedModerate': aVal = a.unreviewedModerate; bVal = b.unreviewedModerate; break;
+        case 'lastReviewed': aVal = a.lastReviewed; bVal = b.lastReviewed; break;
+        case 'complianceRate': aVal = a.complianceRate; bVal = b.complianceRate; break;
+        case 'batteryPct': aVal = a.batteryPct; bVal = b.batteryPct; break;
+        default: aVal = a.unreviewedCritical; bVal = b.unreviewedCritical;
       }
-      return b.unreviewedModerate - a.unreviewedModerate;
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      const numA = aVal as number;
+      const numB = bVal as number;
+      return sortDirection === 'asc' ? numA - numB : numB - numA;
     });
 
     return filtered;
-  }, [searchQuery, severityFilter, statusFilter]);
+  }, [searchQuery, severityFilter, statusFilter, sortColumn, sortDirection]);
 
   const getStatusBadge = (status: PatientStatus) => {
     switch (status) {
@@ -70,6 +97,24 @@ export default function Dashboard() {
     }
     return <Badge variant="outline" className="text-slate-500 border-slate-300 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> 0 Unreviewed</Badge>;
   };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+    return sortDirection === 'asc'
+      ? <ChevronUp className="h-3 w-3 ml-1 inline text-primary" />
+      : <ChevronDown className="h-3 w-3 ml-1 inline text-primary" />;
+  };
+
+  const SortableHead = ({ column, children, className }: { column: SortColumn; children: React.ReactNode; className?: string }) => (
+    <TableHead
+      className={cn("cursor-pointer select-none hover:bg-slate-50 dark:hover:bg-slate-800/50 whitespace-nowrap", className)}
+      onClick={() => handleSort(column)}
+      data-testid={`sort-${column}`}
+    >
+      {children}
+      <SortIcon column={column} />
+    </TableHead>
+  );
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
@@ -166,15 +211,15 @@ export default function Dashboard() {
             <Table data-testid="patient-table">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Patient Name</TableHead>
+                  <SortableHead column="name">Patient Name</SortableHead>
                   <TableHead>MRN</TableHead>
-                  <TableHead>Age</TableHead>
+                  <SortableHead column="age">Age</SortableHead>
                   <TableHead>Diagnosis</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Battery</TableHead>
+                  <SortableHead column="batteryPct">Battery</SortableHead>
                   <TableHead>Last Data</TableHead>
-                  <TableHead>Unreviewed Events</TableHead>
-                  <TableHead>Last Reviewed</TableHead>
+                  <SortableHead column="unreviewedCritical">Unreviewed Events</SortableHead>
+                  <SortableHead column="lastReviewed">Last Reviewed</SortableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -186,7 +231,7 @@ export default function Dashboard() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPatients.map((patient, i) => (
+                  filteredPatients.map((patient) => (
                     <TableRow key={patient.id} data-testid={`row-patient-${patient.id}`}>
                       <TableCell className="font-medium">{patient.name}</TableCell>
                       <TableCell className="font-mono text-xs text-slate-500">{patient.mrn}</TableCell>
@@ -196,9 +241,9 @@ export default function Dashboard() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className="w-16 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full ${patient.batteryPct < 20 ? 'bg-red-500' : 'bg-green-500'}`} 
-                              style={{ width: `${patient.batteryPct}%` }} 
+                            <div
+                              className={`h-full ${patient.batteryPct < 20 ? 'bg-red-500' : 'bg-green-500'}`}
+                              style={{ width: `${patient.batteryPct}%` }}
                             />
                           </div>
                           <span className="text-xs font-mono">{patient.batteryPct}%</span>
