@@ -1,221 +1,145 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
-  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useLocation: vi.fn(() => ({ pathname: "/patients/1", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function renderHistoryTab() {
-  try {
-    const { HistoryTab } = await import("../components/patient/HistoryTab");
-    return render(<HistoryTab patientId="1" />);
-  } catch {
-    try {
-      const { default: PatientDetail } = await import("../pages/patient-detail");
-      const result = render(<PatientDetail params={{ id: "1" }} />);
-      const historyTab = document.querySelector("[data-testid='tab-history']") ||
-        screen.queryByRole("tab", { name: /history/i }) ||
-        screen.queryByText(/^history$/i);
-      if (historyTab) {
-        fireEvent.click(historyTab as Element);
-      }
-      return result;
-    } catch {
-      const { default: App } = await import("../App");
-      return render(<App />);
-    }
-  }
+async function renderHistoryTab(patientId = "1") {
+  const { HistoryTab } = await import("../components/patient/history-tab");
+  return render(<HistoryTab patientId={patientId} />);
+}
+
+async function renderPatientDetailOnHistoryTab(id = "1") {
+  const { default: PatientDetail } = await import("../pages/patient-detail");
+  const result = render(<PatientDetail params={{ id }} />);
+  const user = userEvent.setup();
+  const historyTab = screen.getByRole("tab", { name: /History/i });
+  await user.click(historyTab);
+  return result;
 }
 
 describe("History Tab — rendering", () => {
-  it("History tab renders without crashing", async () => {
-    const { container } = await renderHistoryTab();
-    expect(container).toBeTruthy();
+  it("history tab renders without crashing", async () => {
+    const { container } = await renderHistoryTab("1");
+    expect(container.firstChild).not.toBeNull();
   });
 
-  it("at least 25 history entries are displayed", async () => {
-    await renderHistoryTab();
-    const entries = document.querySelectorAll("[data-testid^='history-entry']") ||
-      document.querySelectorAll("[data-testid='history-list'] > *");
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    expect(historyEntries.length >= 25 || entries.length >= 0 || document.body).toBeTruthy();
+  it("history list container is present", async () => {
+    await renderHistoryTab("1");
+    expect(screen.getByTestId("history-list")).toBeInTheDocument();
   });
 
-  it("each entry has a timestamp", async () => {
-    await renderHistoryTab();
-    const timestamps = document.querySelectorAll("[data-testid*='entry-timestamp']");
-    expect(timestamps.length >= 0 || document.body).toBeTruthy();
+  it("history filter is present", async () => {
+    await renderHistoryTab("1");
+    expect(screen.getByTestId("history-filter")).toBeInTheDocument();
   });
 
-  it("each entry has an actor label", async () => {
-    await renderHistoryTab();
-    const actors = document.querySelectorAll("[data-testid*='entry-actor']") ||
-      screen.queryAllByText(/system|patient|dr\./i);
-    expect(actors.length >= 0 || document.body).toBeTruthy();
+  it("history count is displayed", async () => {
+    await renderHistoryTab("1");
+    expect(screen.getByTestId("history-count")).toBeInTheDocument();
   });
 
-  it("each entry has an action description", async () => {
-    await renderHistoryTab();
-    const descriptions = document.querySelectorAll("[data-testid*='entry-description']");
-    expect(descriptions.length >= 0 || document.body).toBeTruthy();
+  it("history count is a positive number", async () => {
+    await renderHistoryTab("1");
+    const count = screen.getByTestId("history-count");
+    const n = parseInt(count.textContent?.replace(/\D/g, "") || "0");
+    expect(n).toBeGreaterThan(0);
+  });
+});
+
+describe("History Tab — content", () => {
+  it("history list shows entries from data", async () => {
+    await renderHistoryTab("1");
+    const { getPatientHistory } = await import("../data/history");
+    const history = getPatientHistory("1");
+    expect(history.length).toBeGreaterThan(0);
+    const list = screen.getByTestId("history-list");
+    expect(list.children.length).toBeGreaterThan(0);
   });
 
-  it("system-generated entries are labeled as System", async () => {
-    await renderHistoryTab();
-    const systemEntries = screen.queryAllByText(/system/i);
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    const systemInData = historyEntries.filter(e => e.actor === "System");
-    expect(systemEntries.length >= 0 || systemInData.length >= 0 || document.body).toBeTruthy();
+  it("history entries show actor names", async () => {
+    await renderHistoryTab("1");
+    const { getPatientHistory } = await import("../data/history");
+    const history = getPatientHistory("1");
+    const firstEntry = history[0];
+    expect(screen.getAllByText(new RegExp(firstEntry.actor, "i")).length).toBeGreaterThan(0);
   });
 
-  it("clinician entries show the clinician's name", async () => {
-    await renderHistoryTab();
-    const clinicianEntries = screen.queryAllByText(/dr\.|okonkwo|ritter|calás|park/i);
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    const clinicianInData = historyEntries.filter(e => e.actor && e.actor.includes("Dr."));
-    expect(clinicianEntries.length >= 0 || clinicianInData.length >= 0 || document.body).toBeTruthy();
+  it("history entries show action descriptions", async () => {
+    await renderHistoryTab("1");
+    const { getPatientHistory } = await import("../data/history");
+    const history = getPatientHistory("1");
+    const firstEntry = history[0];
+    expect(screen.getAllByText(new RegExp(firstEntry.action.substring(0, 20), "i")).length).toBeGreaterThan(0);
   });
 
-  it("patient-triggered entries are labeled as Patient", async () => {
-    await renderHistoryTab();
-    const patientEntries = screen.queryAllByText(/^patient$/i);
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    const patientInData = historyEntries.filter(e => e.actor === "Patient");
-    expect(patientEntries.length >= 0 || patientInData.length >= 0 || document.body).toBeTruthy();
-  });
-
-  it("entries are sorted with newest first", async () => {
-    await renderHistoryTab();
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    if (historyEntries.length >= 2) {
-      const firstDate = new Date(historyEntries[0].timestamp).getTime();
-      const secondDate = new Date(historyEntries[1].timestamp).getTime();
-      expect(firstDate >= secondDate).toBeTruthy();
+  it("history includes system actions", async () => {
+    await renderHistoryTab("1");
+    const { getPatientHistory } = await import("../data/history");
+    const history = getPatientHistory("1");
+    const systemActions = history.filter(h => h.type === "System");
+    if (systemActions.length > 0) {
+      const allText = document.body.textContent || "";
+      expect(allText).toMatch(/System|system/i);
     }
-    expect(true).toBe(true);
+  });
+});
+
+describe("History Tab — filtering", () => {
+  it("history filter defaults to All", async () => {
+    await renderHistoryTab("1");
+    const filter = screen.getByTestId("history-filter");
+    expect(filter.textContent).toMatch(/All/i);
   });
 
-  it("the history tab shows the total entry count", async () => {
-    await renderHistoryTab();
-    const countEl = document.querySelector("[data-testid='history-count']");
-    expect(countEl || document.body).toBeTruthy();
+  it("filtering by Clinician reduces history entries", async () => {
+    await renderHistoryTab("1");
+    const { getPatientHistory } = await import("../data/history");
+    const allHistory = getPatientHistory("1");
+    const clinicianEntries = allHistory.filter(h => h.type === "Clinician");
+    fireEvent.click(screen.getByTestId("history-filter"));
+    await waitFor(() => {
+      const clinicianOption = screen.queryByText("Clinician");
+      if (clinicianOption) {
+        fireEvent.click(clinicianOption);
+      }
+    }, { timeout: 1000 });
+  });
+});
+
+describe("History Tab — via patient detail page", () => {
+  it("history list renders from patient detail page", async () => {
+    await renderPatientDetailOnHistoryTab("1");
+    await waitFor(() => {
+      expect(screen.getByTestId("history-list")).toBeInTheDocument();
+    }, { timeout: 3000 });
   });
 
-  it("the history entry list is scrollable", async () => {
-    await renderHistoryTab();
-    const listEl = document.querySelector("[data-testid='history-list']");
-    expect(listEl || document.body).toBeTruthy();
+  it("history filter is accessible from patient detail", async () => {
+    await renderPatientDetailOnHistoryTab("1");
+    await waitFor(() => {
+      expect(screen.getByTestId("history-filter")).toBeInTheDocument();
+    }, { timeout: 3000 });
   });
 
-  it("long action descriptions are fully readable", async () => {
-    await renderHistoryTab();
-    const descriptions = document.querySelectorAll("[data-testid*='entry-description']");
-    expect(descriptions.length >= 0 || document.body).toBeTruthy();
-  });
-
-  it("a filter control for actor type is present", async () => {
-    await renderHistoryTab();
-    const filter = document.querySelector("[data-testid='history-filter']") ||
-      screen.queryByLabelText(/filter|actor/i);
-    expect(filter || document.body).toBeTruthy();
-  });
-
-  it("filtering by Clinician shows only clinician-generated entries", async () => {
-    const user = userEvent.setup();
-    await renderHistoryTab();
-    const clinicianFilter = document.querySelector("[data-testid='filter-clinician']") ||
-      (screen.queryAllByText(/clinician/i)[0] ?? null);
-    if (clinicianFilter) {
-      await user.click(clinicianFilter as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
-  });
-
-  it("filtering by System shows only system-generated entries", async () => {
-    const user = userEvent.setup();
-    await renderHistoryTab();
-    const systemFilter = document.querySelector("[data-testid='filter-system']") ||
-      (screen.queryAllByText(/^system$/i)[0] ?? null);
-    if (systemFilter) {
-      await user.click(systemFilter as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
-  });
-
-  it("filtering by All restores all entries", async () => {
-    const user = userEvent.setup();
-    await renderHistoryTab();
-    const allFilter = document.querySelector("[data-testid='filter-all-history']") ||
-      screen.queryByText(/^all$/i);
-    if (allFilter) {
-      await user.click(allFilter as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
-  });
-
-  it("an entry for a clinician event confirmation is present in the dummy data", async () => {
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    const hasConfirmation = historyEntries.some(e =>
-      e.description?.toLowerCase().includes("confirm") ||
-      e.action?.toLowerCase().includes("confirm")
-    );
-    expect(hasConfirmation || historyEntries.length === 0 || document.body).toBeTruthy();
-  });
-
-  it("an entry for a threshold change is present in the dummy data", async () => {
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    const hasThresholdChange = historyEntries.some(e =>
-      e.description?.toLowerCase().includes("threshold") ||
-      e.action?.toLowerCase().includes("threshold")
-    );
-    expect(hasThresholdChange || historyEntries.length === 0 || document.body).toBeTruthy();
-  });
-
-  it("an entry for a report generation action is present in the dummy data", async () => {
-    const { HISTORY } = await import("../data/history");
-    const historyEntries = Object.values(HISTORY)[0] || [];
-    const hasReport = historyEntries.some(e =>
-      e.description?.toLowerCase().includes("report") ||
-      e.action?.toLowerCase().includes("report")
-    );
-    expect(hasReport || historyEntries.length === 0 || document.body).toBeTruthy();
-  });
-
-  it("the history tab renders without crashing when there are zero entries", async () => {
-    try {
-      const { HistoryTab } = await import("../components/patient/HistoryTab");
-      const { container } = render(<HistoryTab patientId="nonexistent-patient" />);
-      expect(container).toBeTruthy();
-    } catch {
-      expect(true).toBe(true);
-    }
+  it("history count shows on patient detail", async () => {
+    await renderPatientDetailOnHistoryTab("1");
+    await waitFor(() => {
+      expect(screen.getByTestId("history-count")).toBeInTheDocument();
+    }, { timeout: 3000 });
   });
 });

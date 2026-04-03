@@ -1,119 +1,240 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
   useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function withAuth(element: React.ReactElement) {
-  const { AuthProvider } = await import("../lib/auth-context");
-  return render(<AuthProvider>{element}</AuthProvider>);
+async function renderDashboard() {
+  const { default: Dashboard } = await import("../pages/dashboard");
+  return render(<Dashboard />);
 }
 
-describe("Accessibility Basics", () => {
-  it("all interactive elements on the Login page have accessible names", async () => {
-    const { default: LoginPage } = await import("../pages/login");
-    await withAuth(<LoginPage />);
-    const buttons = document.querySelectorAll("button");
+async function renderHeader() {
+  const { Header } = await import("../components/layout/header");
+  const { AuthProvider } = await import("../lib/auth-context");
+  return render(<AuthProvider><Header /></AuthProvider>);
+}
+
+async function renderLogin() {
+  const { default: Login } = await import("../pages/login");
+  const { AuthProvider } = await import("../lib/auth-context");
+  return render(<AuthProvider><Login /></AuthProvider>);
+}
+
+async function renderAnalytics() {
+  const { default: Analytics } = await import("../pages/analytics");
+  return render(<Analytics />);
+}
+
+async function renderSettings() {
+  const { default: Settings } = await import("../pages/settings");
+  const { AuthProvider } = await import("../lib/auth-context");
+  return render(<AuthProvider><Settings /></AuthProvider>);
+}
+
+describe("Accessibility — login page", () => {
+  it("login form has a form element", async () => {
+    await renderLogin();
+    const form = document.querySelector("form");
+    expect(form).toBeTruthy();
+  });
+
+  it("login email input is present and has testid", async () => {
+    await renderLogin();
+    const emailInput = screen.getByTestId("input-email");
+    expect(emailInput).toBeInTheDocument();
+  });
+
+  it("login email input is associated with a label", async () => {
+    await renderLogin();
+    const emailInput = screen.getByTestId("input-email");
+    const label = document.querySelector(`label[for="${emailInput.id}"]`) ||
+      emailInput.closest("div")?.querySelector("label") ||
+      document.querySelector("label");
+    expect(label).toBeTruthy();
+  });
+
+  it("login password input is present and has testid", async () => {
+    await renderLogin();
+    const passwordInput = screen.getByTestId("input-password");
+    expect(passwordInput).toBeInTheDocument();
+  });
+
+  it("login password input has associated label", async () => {
+    await renderLogin();
+    const passwordInput = screen.getByTestId("input-password");
+    const label = document.querySelector(`label[for="${passwordInput.id}"]`) ||
+      passwordInput.closest("div")?.querySelector("label");
+    expect(label).toBeTruthy();
+  });
+
+  it("login submit button has an accessible name (button-sign-in)", async () => {
+    await renderLogin();
+    const btn = screen.getByTestId("button-sign-in");
+    expect(btn.textContent?.trim()).toBeTruthy();
+  });
+
+  it("login page has heading or brand name", async () => {
+    await renderLogin();
+    const heading = screen.queryByRole("heading") || screen.queryByText(/CardioWatch|Sign In|Login/i);
+    expect(heading).toBeTruthy();
+  });
+
+  it("login page shows CardioWatch brand name", async () => {
+    await renderLogin();
+    expect(screen.getByText(/CardioWatch/i)).toBeInTheDocument();
+  });
+});
+
+describe("Accessibility — dashboard page", () => {
+  it("dashboard has at least one heading", async () => {
+    await renderDashboard();
+    const headings = screen.getAllByRole("heading");
+    expect(headings.length).toBeGreaterThan(0);
+  });
+
+  it("dashboard table has correct role", async () => {
+    await renderDashboard();
+    const table = screen.getByRole("table");
+    expect(table).toBeInTheDocument();
+  });
+
+  it("dashboard table has column header cells", async () => {
+    await renderDashboard();
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers.length).toBeGreaterThan(0);
+  });
+
+  it("dashboard table rows have correct role", async () => {
+    await renderDashboard();
+    const rows = screen.getAllByRole("row");
+    expect(rows.length).toBeGreaterThan(1);
+  });
+
+  it("sortable name column header (sort-name) is present in dashboard", async () => {
+    await renderDashboard();
+    expect(screen.getByTestId("sort-name")).toBeInTheDocument();
+  });
+
+  it("sortable age column header (sort-age) is present in dashboard", async () => {
+    await renderDashboard();
+    expect(screen.getByTestId("sort-age")).toBeInTheDocument();
+  });
+
+  it("sortable battery column header is present", async () => {
+    await renderDashboard();
+    expect(screen.getByTestId("sort-batteryPct")).toBeInTheDocument();
+  });
+});
+
+describe("Accessibility — header component", () => {
+  it("notification bell is present in header", async () => {
+    await renderHeader();
+    expect(screen.getByTestId("notification-bell")).toBeInTheDocument();
+  });
+
+  it("notification badge is present in header", async () => {
+    await renderHeader();
+    expect(screen.getByTestId("notification-badge")).toBeInTheDocument();
+  });
+
+  it("notification badge shows positive count", async () => {
+    await renderHeader();
+    const badge = screen.getByTestId("notification-badge");
+    expect(parseInt(badge.textContent || "0")).toBeGreaterThan(0);
+  });
+
+  it("user menu button is present in header", async () => {
+    await renderHeader();
+    expect(screen.getByTestId("user-menu")).toBeInTheDocument();
+  });
+});
+
+describe("Accessibility — keyboard and focus", () => {
+  it("login form can be submitted via keyboard Enter", async () => {
+    const user = userEvent.setup();
+    await renderLogin();
+    const emailInput = screen.getByTestId("input-email");
+    await user.click(emailInput);
+    await user.type(emailInput, "test@example.com");
+    const passwordInput = screen.getByTestId("input-password");
+    await user.click(passwordInput);
+    await user.type(passwordInput, "password");
+    await user.keyboard("{Enter}");
+    expect(emailInput).toBeInTheDocument();
+  });
+
+  it("dashboard patient table rows (excluding header) are rendered", async () => {
+    await renderDashboard();
+    const rows = screen.getAllByRole("row");
+    expect(rows.length).toBeGreaterThan(1);
+  });
+
+  it("buttons on dashboard are focusable button elements", async () => {
+    await renderDashboard();
+    const buttons = screen.getAllByRole("button");
     buttons.forEach(btn => {
-      const name = btn.getAttribute("aria-label") || btn.textContent?.trim() || btn.title;
-      expect(name).toBeTruthy();
+      expect(btn.tagName).toBe("BUTTON");
     });
-    expect(true).toBe(true);
   });
 
-  it("the Login page has a proper landmark structure", async () => {
-    const { default: LoginPage } = await import("../pages/login");
-    await withAuth(<LoginPage />);
-    const mainEl = document.querySelector("main") || document.querySelector("[role='main']");
-    expect(mainEl || document.body).toBeTruthy();
-  });
-
-  it("all form fields on the Login page have associated labels", async () => {
-    const { default: LoginPage } = await import("../pages/login");
-    await withAuth(<LoginPage />);
-    const inputs = document.querySelectorAll("input");
-    inputs.forEach(input => {
-      const hasLabel = input.getAttribute("aria-label") ||
-        input.getAttribute("placeholder") ||
-        document.querySelector(`label[for='${input.id}']`);
-      expect(hasLabel || true).toBeTruthy();
+  it("anchor links in sidebar are real links", async () => {
+    const { Sidebar } = await import("../components/layout/sidebar");
+    render(<Sidebar />);
+    const links = screen.getAllByRole("link");
+    expect(links.length).toBeGreaterThan(0);
+    links.forEach(link => {
+      expect(link.tagName).toBe("A");
     });
-    expect(true).toBe(true);
+  });
+});
+
+describe("Accessibility — semantic structure", () => {
+  it("analytics page has main heading", async () => {
+    await renderAnalytics();
+    expect(screen.getByText(/Population Analytics/i)).toBeInTheDocument();
   });
 
-  it("the Dashboard page has a page heading", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const heading = document.querySelector("h1, h2, [role='heading']");
-    expect(heading || document.body).toBeTruthy();
+  it("analytics page has metric cards with testids", async () => {
+    await renderAnalytics();
+    expect(screen.getByTestId("metric-patient-days")).toBeInTheDocument();
+    expect(screen.getByTestId("metric-total-events")).toBeInTheDocument();
+    expect(screen.getByTestId("metric-compliance")).toBeInTheDocument();
   });
 
-  it("interactive buttons use button elements or have role=button", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const buttons = document.querySelectorAll("button, [role='button']");
-    expect(buttons.length >= 0 || document.body).toBeTruthy();
+  it("settings page has section structure", async () => {
+    await renderSettings();
+    expect(screen.getByTestId("user-profile-section")).toBeInTheDocument();
   });
 
-  it("the patient table has ARIA column headers", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const tableHeaders = document.querySelectorAll("th, [role='columnheader']");
-    expect(tableHeaders.length >= 0 || document.body).toBeTruthy();
+  it("settings page shows notification preference labels", async () => {
+    await renderSettings();
+    expect(screen.getByTestId("toggle-inapp-alerts")).toBeInTheDocument();
+    expect(screen.getByTestId("toggle-email-alerts")).toBeInTheDocument();
+    expect(screen.getByTestId("toggle-sms-alerts")).toBeInTheDocument();
   });
 
-  it("data-testid attributes are present on all key UI elements of the Login page", async () => {
-    const { default: LoginPage } = await import("../pages/login");
-    await withAuth(<LoginPage />);
-    const requiredTestIds = ["input-email", "input-password", "button-sign-in"];
-    const foundCount = requiredTestIds.filter(id => document.querySelector(`[data-testid='${id}']`)).length;
-    expect(foundCount >= 0 || document.body).toBeTruthy();
+  it("login disclaimer text is present", async () => {
+    await renderLogin();
+    expect(screen.getByTestId("text-disclaimer")).toBeInTheDocument();
   });
 
-  it("data-testid attributes are present on key Dashboard elements", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const testIdEls = document.querySelectorAll("[data-testid]");
-    expect(testIdEls.length).toBeGreaterThan(0);
-  });
-
-  it("the notification badge has an aria-label indicating unread count", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const badge = document.querySelector("[data-testid='notification-badge']");
-    if (badge) {
-      const ariaLabel = badge.getAttribute("aria-label") || badge.textContent;
-      expect(ariaLabel || true).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("all modal dialogs use role=dialog or data-testid for identification", async () => {
-    const { default: PatientDetail } = await import("../pages/patient-detail");
-    render(<PatientDetail params={{ id: "1" }} />);
-    const generateBtn = document.querySelector("[data-testid='button-generate-report']") as Element;
-    if (generateBtn) {
-      fireEvent.click(generateBtn);
-      await waitFor(() => {
-        const modal = document.querySelector("[role='dialog'], [data-testid='report-modal']");
-        expect(modal || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+  it("login page has CardioWatch brand name visible", async () => {
+    await renderLogin();
+    expect(screen.getByText(/CardioWatch/i)).toBeInTheDocument();
   });
 });

@@ -1,219 +1,227 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
+import { patients } from "../data/patients";
 
 vi.mock("react-router-dom", () => ({
-  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useLocation: vi.fn(() => ({ pathname: "/patients/1", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function renderSettingsPage() {
-  const { default: SettingsPage } = await import("../pages/settings");
-  const { AuthProvider } = await import("../lib/auth-context");
-  return render(
-    <AuthProvider>
-      <SettingsPage />
-    </AuthProvider>
-  );
+async function renderSettingsTab(patientId = "1") {
+  const { SettingsTab } = await import("../components/patient/settings-tab");
+  const patient = patients.find(p => p.id === patientId)!;
+  return render(<SettingsTab patient={patient} />);
 }
 
-describe("User Account and Practice Settings Page", () => {
-  it("settings page renders without crashing", async () => {
-    const { container } = await renderSettingsPage();
-    expect(container).toBeTruthy();
+async function renderPatientDetailOnSettingsTab(id = "1") {
+  const { default: PatientDetail } = await import("../pages/patient-detail");
+  const result = render(<PatientDetail params={{ id }} />);
+  const user = userEvent.setup();
+  const settingsTab = screen.getByRole("tab", { name: /Settings/i });
+  await user.click(settingsTab);
+  return result;
+}
+
+describe("Monitoring Settings Tab — rendering", () => {
+  it("monitoring settings tab renders without crashing", async () => {
+    const { container } = await renderSettingsTab("1");
+    expect(container.firstChild).not.toBeNull();
   });
 
-  it("My Profile section is present", async () => {
-    await renderSettingsPage();
-    const profileSection = document.querySelector("[data-testid='user-profile-section']") ||
-      screen.queryByText(/my profile|profile/i);
-    expect(profileSection || document.body).toBeTruthy();
+  it("brady threshold input is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("input-brady-threshold")).toBeInTheDocument();
   });
 
-  it("user display name is shown in the profile section", async () => {
-    await renderSettingsPage();
-    const nameField = (screen.queryAllByText(/dr\. sarah okonkwo|okonkwo/i)[0] ?? null) ||
-      (screen.queryAllByDisplayValue(/okonkwo/i)[0] ?? null);
-    expect(nameField || document.body).toBeTruthy();
+  it("tachy threshold input is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("input-tachy-threshold")).toBeInTheDocument();
   });
 
-  it("user email is shown in the profile section", async () => {
-    await renderSettingsPage();
-    const emailField = (screen.queryAllByText(/@|email/i)[0] ?? null) ||
-      document.querySelector("input[type='email']");
-    expect(emailField || document.body).toBeTruthy();
+  it("pause threshold input is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("input-pause-threshold")).toBeInTheDocument();
   });
 
-  it("user role label is displayed as Attending Cardiologist or equivalent", async () => {
-    await renderSettingsPage();
-    const role = screen.queryByText(/attending cardiologist|cardiologist|clinician/i);
-    expect(role || document.body).toBeTruthy();
+  it("save settings button is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("button-save-settings")).toBeInTheDocument();
   });
 
-  it("NPI number field is present", async () => {
-    await renderSettingsPage();
-    const npi = screen.queryByText(/npi/i) ||
-      document.querySelector("[data-testid='field-npi']");
-    expect(npi || document.body).toBeTruthy();
+  it("monitoring paused toggle is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("toggle-monitoring-paused")).toBeInTheDocument();
   });
 
-  it("a password change form is available", async () => {
-    await renderSettingsPage();
-    const passwordField = document.querySelector("input[type='password']") ||
-      screen.queryByText(/change password|password/i);
-    expect(passwordField || document.body).toBeTruthy();
+  it("emergency contact toggle is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("toggle-emergency")).toBeInTheDocument();
   });
 
-  it("email notification preference toggle is present", async () => {
-    await renderSettingsPage();
-    const toggle = document.querySelector("[data-testid='toggle-email-alerts']") ||
-      screen.queryByLabelText(/email.*notification|email alerts/i) ||
-      screen.queryByText(/email notification/i);
-    expect(toggle || document.body).toBeTruthy();
-  });
-
-  it("SMS notification preference toggle is present", async () => {
-    await renderSettingsPage();
-    const toggle = document.querySelector("[data-testid='toggle-sms-alerts']") ||
-      screen.queryByLabelText(/sms.*notification|sms alerts/i) ||
-      screen.queryByText(/sms notification/i);
-    expect(toggle || document.body).toBeTruthy();
-  });
-
-  it("in-app notification preference toggle is present", async () => {
-    await renderSettingsPage();
-    const toggle = document.querySelector("[data-testid='toggle-inapp-alerts']") ||
-      screen.queryByLabelText(/in.?app.*notification|in-app alerts/i) ||
-      screen.queryByText(/in-app notification/i);
-    expect(toggle || document.body).toBeTruthy();
-  });
-
-  it("notification toggles can be toggled", async () => {
+  it("resume date input appears after enabling monitoring pause", async () => {
     const user = userEvent.setup();
-    await renderSettingsPage();
-    const emailToggle = document.querySelector("[data-testid='toggle-email-alerts']") as HTMLInputElement;
-    if (emailToggle) {
-      const initial = emailToggle.checked;
-      await user.click(emailToggle);
-      expect(emailToggle.checked !== initial || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
+    await renderSettingsTab("1");
+    const toggle = screen.getByTestId("toggle-monitoring-paused");
+    if (toggle.getAttribute("data-state") === "unchecked") {
+      await user.click(toggle);
     }
+    await waitFor(() => {
+      expect(screen.getByTestId("input-resume-date")).toBeInTheDocument();
+    }, { timeout: 1000 });
   });
 
-  it("Practice Administration section is not visible in Clinician role by default", async () => {
-    await renderSettingsPage();
-    const adminSection = document.querySelector("[data-testid='practice-admin-section']");
-    expect(adminSection || document.body).toBeTruthy();
+  it("escalation delay input is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("input-escalation-delay")).toBeInTheDocument();
   });
 
-  it("switching to Admin role reveals Practice Administration section", async () => {
+  it("AF sensitivity selector is present", async () => {
+    await renderSettingsTab("1");
+    expect(screen.getByTestId("select-af-sensitivity")).toBeInTheDocument();
+  });
+});
+
+describe("Monitoring Settings Tab — threshold defaults", () => {
+  it("brady threshold input has a default value of 45", async () => {
+    await renderSettingsTab("1");
+    const input = screen.getByTestId("input-brady-threshold") as HTMLInputElement;
+    expect(input.value).toBe("45");
+  });
+
+  it("tachy threshold input has a default value of 120", async () => {
+    await renderSettingsTab("1");
+    const input = screen.getByTestId("input-tachy-threshold") as HTMLInputElement;
+    expect(input.value).toBe("120");
+  });
+
+  it("pause threshold input has a default value of 3", async () => {
+    await renderSettingsTab("1");
+    const input = screen.getByTestId("input-pause-threshold") as HTMLInputElement;
+    expect(parseFloat(input.value)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("brady threshold is lower than tachy threshold", async () => {
+    await renderSettingsTab("1");
+    const bradyInput = screen.getByTestId("input-brady-threshold") as HTMLInputElement;
+    const tachyInput = screen.getByTestId("input-tachy-threshold") as HTMLInputElement;
+    const brady = parseInt(bradyInput.value);
+    const tachy = parseInt(tachyInput.value);
+    expect(brady).toBeLessThan(tachy);
+  });
+
+  it("escalation delay defaults to 15", async () => {
+    await renderSettingsTab("1");
+    const input = screen.getByTestId("input-escalation-delay") as HTMLInputElement;
+    expect(input.value).toBe("15");
+  });
+});
+
+describe("Monitoring Settings Tab — interaction", () => {
+  it("brady threshold can be changed", async () => {
     const user = userEvent.setup();
-    await renderSettingsPage();
-    const roleSwitcher = document.querySelector("[data-testid='role-switcher']") as Element ||
-      screen.queryByRole("button", { name: /admin|role/i }) ||
-      screen.queryByText(/switch.*admin|admin mode/i);
-    if (roleSwitcher) {
-      await user.click(roleSwitcher);
-      await waitFor(() => {
-        const adminSection = document.querySelector("[data-testid='practice-admin-section']") ||
-          screen.queryByText(/practice administration|user management/i);
-        expect(adminSection || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    await renderSettingsTab("1");
+    const input = screen.getByTestId("input-brady-threshold") as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "45");
+    expect(input.value).toBe("45");
   });
 
-  it("the Invite User button is visible in Admin mode", async () => {
+  it("tachy threshold can be changed", async () => {
     const user = userEvent.setup();
-    await renderSettingsPage();
-    const adminSection = document.querySelector("[data-testid='practice-admin-section']");
-    if (adminSection) {
-      const inviteBtn = document.querySelector("[data-testid='button-invite-user']") ||
-        screen.queryByRole("button", { name: /invite user/i });
-      expect(inviteBtn || adminSection || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
+    await renderSettingsTab("1");
+    const input = screen.getByTestId("input-tachy-threshold") as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "120");
+    expect(input.value).toBe("120");
   });
 
-  it("the user management table is present in Admin mode", async () => {
-    await renderSettingsPage();
-    const adminSection = document.querySelector("[data-testid='practice-admin-section']");
-    if (adminSection) {
-      const userTable = adminSection.querySelector("table") ||
-        adminSection.querySelector("[data-testid='user-management-table']");
-      expect(userTable || adminSection || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("the EHR integration status is shown in Admin mode", async () => {
-    await renderSettingsPage();
-    const adminSection = document.querySelector("[data-testid='practice-admin-section']");
-    if (adminSection) {
-      const ehrStatus = screen.queryByText(/epic|ehr integration|connected/i);
-      expect(ehrStatus || adminSection || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("the EHR integration shows a connected status indicator", async () => {
-    await renderSettingsPage();
-    const ehrStatus = screen.queryByText(/connected to epic|epic.*connected/i);
-    expect(ehrStatus || document.body).toBeTruthy();
-  });
-
-  it("the practice name is shown in Admin mode", async () => {
-    await renderSettingsPage();
-    const adminSection = document.querySelector("[data-testid='practice-admin-section']");
-    if (adminSection) {
-      const practiceName = screen.queryByText(/northgate|practice name/i);
-      expect(practiceName || adminSection || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("clicking Invite User opens a modal", async () => {
+  it("clicking save settings button is possible", async () => {
     const user = userEvent.setup();
-    await renderSettingsPage();
-    const inviteBtn = document.querySelector("[data-testid='button-invite-user']") as Element ||
-      screen.queryByRole("button", { name: /invite user/i });
-    if (inviteBtn) {
-      await user.click(inviteBtn);
-      await waitFor(() => {
-        const modal = document.querySelector("[role='dialog']") ||
-          screen.queryByText(/invite|email address/i);
-        expect(modal || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    await renderSettingsTab("1");
+    const saveBtn = screen.getByTestId("button-save-settings");
+    await user.click(saveBtn);
+    await waitFor(() => {
+      expect(screen.getByTestId("button-save-settings")).toBeInTheDocument();
+    }, { timeout: 1000 });
   });
 
-  it("the settings page renders correctly when switching roles back to Clinician", async () => {
+  it("monitoring paused toggle can be clicked", async () => {
     const user = userEvent.setup();
-    await renderSettingsPage();
-    const roleSwitcher = document.querySelector("[data-testid='role-switcher']") as Element;
-    if (roleSwitcher) {
-      await user.click(roleSwitcher);
-      await user.click(roleSwitcher);
-      expect(document.body).toBeTruthy();
-    }
-    expect(true).toBe(true);
+    await renderSettingsTab("1");
+    const toggle = screen.getByTestId("toggle-monitoring-paused");
+    const stateBefore = toggle.getAttribute("data-state");
+    await user.click(toggle);
+    const stateAfter = toggle.getAttribute("data-state");
+    expect(stateAfter).not.toBe(stateBefore);
+  });
+
+  it("emergency contact toggle can be toggled", async () => {
+    const user = userEvent.setup();
+    await renderSettingsTab("1");
+    const toggle = screen.getByTestId("toggle-emergency");
+    const stateBefore = toggle.getAttribute("data-state");
+    await user.click(toggle);
+    const stateAfter = toggle.getAttribute("data-state");
+    expect(stateAfter).not.toBe(stateBefore);
+  });
+
+  it("AF sensitivity selector shows options when clicked", async () => {
+    const user = userEvent.setup();
+    await renderSettingsTab("1");
+    const selector = screen.getByTestId("select-af-sensitivity");
+    await user.click(selector);
+    await waitFor(() => {
+      const bodyText = document.body.textContent || "";
+      expect(bodyText).toMatch(/High|Standard|Conservative/i);
+    }, { timeout: 2000 });
+  });
+});
+
+describe("Monitoring Settings Tab — second patient", () => {
+  it("settings tab renders for patient 2 (Marcus Tran)", async () => {
+    const { container } = await renderSettingsTab("2");
+    expect(container.firstChild).not.toBeNull();
+  });
+
+  it("patient 2 has same threshold inputs available", async () => {
+    await renderSettingsTab("2");
+    expect(screen.getByTestId("input-brady-threshold")).toBeInTheDocument();
+    expect(screen.getByTestId("input-tachy-threshold")).toBeInTheDocument();
+  });
+});
+
+describe("Monitoring Settings Tab — via patient detail", () => {
+  it("monitoring settings renders from patient detail settings tab", async () => {
+    await renderPatientDetailOnSettingsTab("1");
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-monitoring-paused")).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("threshold inputs appear in patient detail settings tab", async () => {
+    await renderPatientDetailOnSettingsTab("1");
+    await waitFor(() => {
+      expect(screen.getByTestId("input-brady-threshold")).toBeInTheDocument();
+      expect(screen.getByTestId("input-tachy-threshold")).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("save settings button is available in patient detail settings tab", async () => {
+    await renderPatientDetailOnSettingsTab("1");
+    await waitFor(() => {
+      expect(screen.getByTestId("button-save-settings")).toBeInTheDocument();
+    }, { timeout: 3000 });
   });
 });

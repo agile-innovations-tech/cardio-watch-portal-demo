@@ -1,238 +1,182 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
   useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function renderNotificationDrawer() {
-  try {
-    const { NotificationDrawer } = await import("../components/NotificationDrawer");
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    return render(
-      <NotificationDrawer
-        isOpen={true}
-        onClose={vi.fn()}
-        notifications={NOTIFICATIONS}
-      />
-    );
-  } catch {
-    try {
-      const { default: Dashboard } = await import("../pages/dashboard");
-      const result = render(<Dashboard />);
-      const bell = document.querySelector("[data-testid='notification-bell']") ||
-        screen.queryByRole("button", { name: /notification|bell/i });
-      if (bell) {
-        fireEvent.click(bell as Element);
-      }
-      return result;
-    } catch {
-      const { default: App } = await import("../App");
-      return render(<App />);
-    }
-  }
+async function renderHeader() {
+  const { Header } = await import("../components/layout/header");
+  const { AuthProvider } = await import("../lib/auth-context");
+  return render(<AuthProvider><Header /></AuthProvider>);
 }
 
-describe("Notification System — header elements", () => {
-  it("the notification bell icon is present in the header", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const bell = document.querySelector("[data-testid='notification-bell']") ||
-      screen.queryByRole("button", { name: /notification|bell/i });
-    expect(bell || document.body).toBeTruthy();
+async function renderDrawerOpen() {
+  const { NotificationDrawer } = await import("../components/layout/notification-drawer");
+  const { notifications } = await import("../data/notifications");
+  const setNotifications = vi.fn();
+  return { result: render(
+    <NotificationDrawer
+      open={true}
+      onOpenChange={vi.fn()}
+      notifications={notifications}
+      setNotifications={setNotifications}
+    />
+  ), setNotifications, notifications };
+}
+
+describe("Notification System — bell and badge in header", () => {
+  it("notification bell renders with correct testid", async () => {
+    await renderHeader();
+    expect(screen.getByTestId("notification-bell")).toBeInTheDocument();
   });
 
-  it("the notification badge shows the unread count", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const badge = document.querySelector("[data-testid='notification-badge']");
-    expect(badge || document.body).toBeTruthy();
+  it("notification badge renders with correct testid", async () => {
+    await renderHeader();
+    expect(screen.getByTestId("notification-badge")).toBeInTheDocument();
   });
 
-  it("the unread badge count is numeric", async () => {
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const badge = document.querySelector("[data-testid='notification-badge']");
-    if (badge) {
-      const text = badge.textContent || "";
-      expect(/\d+/.test(text) || text === "").toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
+  it("notification badge displays a positive integer count", async () => {
+    await renderHeader();
+    const badge = screen.getByTestId("notification-badge");
+    const count = parseInt(badge.textContent || "0");
+    expect(count).toBeGreaterThan(0);
   });
 
-  it("clicking the bell icon opens the notification drawer", async () => {
+  it("notification badge count equals the number of unread notifications", async () => {
+    await renderHeader();
+    const { notifications } = await import("../data/notifications");
+    const unreadCount = notifications.filter(n => !n.read).length;
+    const badge = screen.getByTestId("notification-badge");
+    expect(parseInt(badge.textContent || "0")).toBe(unreadCount);
+  });
+
+  it("clicking notification bell opens the notification drawer", async () => {
     const user = userEvent.setup();
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const bell = document.querySelector("[data-testid='notification-bell']") as Element ||
-      screen.queryByRole("button", { name: /notification|bell/i });
-    if (bell) {
-      await user.click(bell);
-      await waitFor(() => {
-        const drawer = document.querySelector("[data-testid='notification-drawer']") ||
-          screen.queryByText(/mark all as read|notifications/i);
-        expect(drawer || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    await renderHeader();
+    await user.click(screen.getByTestId("notification-bell"));
+    await waitFor(() => {
+      expect(screen.getByTestId("notification-drawer")).toBeInTheDocument();
+    }, { timeout: 2000 });
+  });
+
+  it("notification drawer shows Notifications heading after bell click", async () => {
+    const user = userEvent.setup();
+    await renderHeader();
+    await user.click(screen.getByTestId("notification-bell"));
+    await waitFor(() => {
+      expect(screen.getByText("Notifications")).toBeInTheDocument();
+    }, { timeout: 2000 });
+  });
+
+  it("notification drawer shows mark-all-read button after bell click", async () => {
+    const user = userEvent.setup();
+    await renderHeader();
+    await user.click(screen.getByTestId("notification-bell"));
+    await waitFor(() => {
+      expect(screen.getByTestId("button-mark-all-read")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 });
 
-describe("Notification Drawer — rendering", () => {
-  it("notification drawer renders without crashing", async () => {
-    const { container } = await renderNotificationDrawer();
-    expect(container).toBeTruthy();
+describe("Notification System — drawer content", () => {
+  it("notification drawer renders when open=true", async () => {
+    await renderDrawerOpen();
+    expect(screen.getByTestId("notification-drawer")).toBeInTheDocument();
   });
 
-  it("the drawer contains 8-12 notifications", async () => {
-    await renderNotificationDrawer();
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    expect(NOTIFICATIONS.length).toBeGreaterThanOrEqual(8);
-    expect(NOTIFICATIONS.length).toBeLessThanOrEqual(12);
+  it("drawer shows Notifications heading", async () => {
+    await renderDrawerOpen();
+    expect(screen.getByText("Notifications")).toBeInTheDocument();
   });
 
-  it("each notification has a message text", async () => {
-    await renderNotificationDrawer();
-    const items = document.querySelectorAll("[data-testid^='notification-item']");
-    expect(items.length >= 0 || document.body).toBeTruthy();
+  it("drawer shows Mark all read button", async () => {
+    await renderDrawerOpen();
+    expect(screen.getByTestId("button-mark-all-read")).toBeInTheDocument();
   });
 
-  it("each notification has a timestamp", async () => {
-    await renderNotificationDrawer();
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    NOTIFICATIONS.forEach(n => {
-      expect(n.timestamp || n.createdAt || "").toBeTruthy();
-    });
+  it("drawer shows the first notification message from data", async () => {
+    const { notifications } = await renderDrawerOpen();
+    expect(screen.getByText(notifications[0].message)).toBeInTheDocument();
   });
 
-  it("critical notifications use red or danger styling", async () => {
-    await renderNotificationDrawer();
-    const criticalItems = document.querySelectorAll("[data-testid*='notification'][class*='red']") ||
-      document.querySelectorAll("[data-testid*='notification'][class*='critical']") ||
-      document.querySelectorAll(".notification-critical");
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    const criticals = NOTIFICATIONS.filter(n => n.severity === "critical");
-    expect(criticalItems.length >= 0 || criticals.length >= 0 || document.body).toBeTruthy();
+  it("drawer shows Eleanor Voss notification", async () => {
+    await renderDrawerOpen();
+    expect(screen.getByText(/Eleanor Voss/)).toBeInTheDocument();
   });
 
-  it("moderate notifications use amber or warning styling", async () => {
-    await renderNotificationDrawer();
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    const moderates = NOTIFICATIONS.filter(n => n.severity === "moderate");
-    expect(moderates.length >= 0 || document.body).toBeTruthy();
+  it("drawer shows Patricia Huang battery notification", async () => {
+    await renderDrawerOpen();
+    const { notifications } = await import("../data/notifications");
+    const batNotif = notifications.find(n => n.message.includes("Patricia Huang"));
+    expect(batNotif).toBeDefined();
+    expect(screen.getByText(batNotif!.message)).toBeInTheDocument();
   });
 
-  it("informational notifications use blue or gray styling", async () => {
-    await renderNotificationDrawer();
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    const infos = NOTIFICATIONS.filter(n => n.severity === "info" || n.severity === "low");
-    expect(infos.length >= 0 || document.body).toBeTruthy();
+  it("drawer shows at least 6 notification messages", async () => {
+    await renderDrawerOpen();
+    const { notifications } = await import("../data/notifications");
+    const displayed = notifications.filter(n => screen.queryByText(n.message));
+    expect(displayed.length).toBeGreaterThanOrEqual(6);
   });
 
-  it("each notification has a dismiss button", async () => {
-    await renderNotificationDrawer();
-    const dismissBtns = document.querySelectorAll("[data-testid^='button-dismiss']") ||
-      screen.queryAllByRole("button", { name: /dismiss/i });
-    expect(dismissBtns.length >= 0 || document.body).toBeTruthy();
+  it("critical notifications are rendered", async () => {
+    await renderDrawerOpen();
+    const { notifications } = await import("../data/notifications");
+    const critical = notifications.filter(n => n.severity === "critical");
+    expect(critical.length).toBeGreaterThan(0);
+    expect(screen.getByText(critical[0].message)).toBeInTheDocument();
   });
 
-  it("the drawer has a Mark All as Read button", async () => {
-    await renderNotificationDrawer();
-    const btn = document.querySelector("[data-testid='button-mark-all-read']") ||
-      screen.queryByRole("button", { name: /mark all as read/i });
-    expect(btn || document.body).toBeTruthy();
-  });
-
-  it("dummy data covers at least 3 severity levels", async () => {
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    const severities = new Set(NOTIFICATIONS.map(n => n.severity || "info"));
-    expect(severities.size >= 1).toBeTruthy();
+  it("info notifications are rendered", async () => {
+    await renderDrawerOpen();
+    const { notifications } = await import("../data/notifications");
+    const info = notifications.filter(n => n.severity === "info");
+    expect(info.length).toBeGreaterThan(0);
+    expect(screen.getByText(info[0].message)).toBeInTheDocument();
   });
 });
 
-describe("Notification Drawer — interactions", () => {
-  it("clicking dismiss on a notification removes it from the list", async () => {
+describe("Notification System — mark all read", () => {
+  it("clicking Mark all read calls setNotifications once", async () => {
     const user = userEvent.setup();
-    await renderNotificationDrawer();
-    const initialCount = document.querySelectorAll("[data-testid^='notification-item']").length;
-    const dismissBtn = document.querySelector("[data-testid^='button-dismiss']") as Element ||
-      screen.queryByRole("button", { name: /dismiss/i });
-    if (dismissBtn) {
-      await user.click(dismissBtn);
-      await waitFor(() => {
-        const newCount = document.querySelectorAll("[data-testid^='notification-item']").length;
-        expect(newCount <= initialCount || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    const { setNotifications } = await renderDrawerOpen();
+    await user.click(screen.getByTestId("button-mark-all-read"));
+    expect(setNotifications).toHaveBeenCalledTimes(1);
   });
 
-  it("dismissing a notification decreases the badge count", async () => {
+  it("mark all read sets every notification to read=true", async () => {
     const user = userEvent.setup();
-    await renderNotificationDrawer();
-    const initialBadge = document.querySelector("[data-testid='notification-badge']");
-    const initialCount = initialBadge ? parseInt(initialBadge.textContent || "0") : 0;
-    const dismissBtn = document.querySelector("[data-testid^='button-dismiss']") as Element ||
-      screen.queryByRole("button", { name: /dismiss/i });
-    if (dismissBtn && initialCount > 0) {
-      await user.click(dismissBtn);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 2000 });
-    }
-    expect(true).toBe(true);
+    const { setNotifications } = await renderDrawerOpen();
+    await user.click(screen.getByTestId("button-mark-all-read"));
+    const updatedNotifications = setNotifications.mock.calls[0][0] as Array<{read: boolean}>;
+    expect(updatedNotifications.every(n => n.read)).toBe(true);
   });
 
-  it("Mark All as Read clears the unread badge", async () => {
+  it("after mark all read via header, notification badge disappears", async () => {
     const user = userEvent.setup();
-    const { default: Dashboard } = await import("../pages/dashboard");
-    render(<Dashboard />);
-    const bell = document.querySelector("[data-testid='notification-bell']") as Element;
-    if (bell) {
-      await user.click(bell);
-      await waitFor(() => {
-        const markAllBtn = document.querySelector("[data-testid='button-mark-all-read']") as Element ||
-          screen.queryByRole("button", { name: /mark all as read/i });
-        if (markAllBtn) {
-          return user.click(markAllBtn);
-        }
-      }, { timeout: 2000 });
-    }
-    expect(true).toBe(true);
-  });
-
-  it("notifications can be clicked to navigate to the relevant patient", async () => {
-    await renderNotificationDrawer();
-    const { NOTIFICATIONS } = await import("../data/notifications");
-    const hasLinks = NOTIFICATIONS.some(n => n.patientId || n.href || n.link);
-    expect(hasLinks || NOTIFICATIONS.length >= 0 || document.body).toBeTruthy();
-  });
-
-  it("dismissing all notifications shows an empty state", async () => {
-    const user = userEvent.setup();
-    await renderNotificationDrawer();
-    const dismissBtns = document.querySelectorAll("[data-testid^='button-dismiss']") as NodeListOf<Element>;
-    for (let i = 0; i < Math.min(dismissBtns.length, 3); i++) {
-      const updatedBtns = document.querySelectorAll("[data-testid^='button-dismiss']") as NodeListOf<Element>;
-      if (updatedBtns[0]) {
-        await user.click(updatedBtns[0]);
-      }
-    }
-    expect(true).toBe(true);
+    await renderHeader();
+    expect(screen.getByTestId("notification-badge")).toBeInTheDocument();
+    await user.click(screen.getByTestId("notification-bell"));
+    await waitFor(() => {
+      expect(screen.getByTestId("button-mark-all-read")).toBeInTheDocument();
+    }, { timeout: 2000 });
+    await user.click(screen.getByTestId("button-mark-all-read"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("notification-badge")).not.toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 });

@@ -1,245 +1,143 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
-  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useLocation: vi.fn(() => ({ pathname: "/analytics", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
-
-vi.mock("recharts", async () => {
-  const actual = await vi.importActual<typeof import("recharts")>("recharts");
-  return {
-    ...actual,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="responsive-container" style={{ width: 800, height: 400 }}>
-        {children}
-      </div>
-    ),
-  };
-});
 
 async function renderAnalytics() {
   const { default: Analytics } = await import("../pages/analytics");
   return render(<Analytics />);
 }
 
-describe("Population Analytics — metric cards", () => {
-  it("Analytics page renders without crashing", async () => {
+describe("Population Analytics — page rendering", () => {
+  it("analytics page renders without crashing", async () => {
     const { container } = await renderAnalytics();
-    expect(container).toBeTruthy();
+    expect(container.firstChild).not.toBeNull();
   });
 
-  it("total patient-days metric card is present", async () => {
+  it("Population Analytics heading is present", async () => {
     await renderAnalytics();
-    const card = document.querySelector("[data-testid='metric-patient-days']") ||
-      screen.queryByText(/4,281|patient.?days/i);
-    expect(card || document.body).toBeTruthy();
+    expect(screen.getByText(/Population Analytics/i)).toBeInTheDocument();
   });
 
-  it("total patient-days value is 4,281", async () => {
+  it("Data Export button is present", async () => {
     await renderAnalytics();
-    const value = screen.queryByText(/4,281/);
-    expect(value || document.body).toBeTruthy();
+    expect(screen.getByTestId("button-export")).toBeInTheDocument();
+  });
+});
+
+describe("Population Analytics — summary metrics", () => {
+  it("patient-days metric card is present", async () => {
+    await renderAnalytics();
+    expect(screen.getByTestId("metric-patient-days")).toBeInTheDocument();
   });
 
-  it("total AI events metric card is present", async () => {
+  it("patient-days displays a positive value", async () => {
     await renderAnalytics();
-    const card = document.querySelector("[data-testid='metric-total-events']") ||
-      screen.queryByText(/1,847|total.*events/i);
-    expect(card || document.body).toBeTruthy();
+    const card = screen.getByTestId("metric-patient-days");
+    const text = card.textContent || "";
+    expect(text).toMatch(/\d/);
   });
 
-  it("total AI events value is 1,847", async () => {
+  it("total-events metric card is present", async () => {
     await renderAnalytics();
-    const value = screen.queryByText(/1,847/);
-    expect(value || document.body).toBeTruthy();
+    expect(screen.getByTestId("metric-total-events")).toBeInTheDocument();
   });
 
-  it("confirmed events metric card is present", async () => {
+  it("total-events shows the correct value from data", async () => {
     await renderAnalytics();
-    const card = document.querySelector("[data-testid='metric-confirmed']") ||
-      screen.queryByText(/1,203|confirmed/i);
-    expect(card || document.body).toBeTruthy();
+    const { analyticsSummary } = await import("../data/analytics");
+    const card = screen.getByTestId("metric-total-events");
+    expect(card.textContent).toContain(analyticsSummary.totalEvents.toLocaleString());
   });
 
-  it("confirmed rate is shown as 65%", async () => {
+  it("confirmed-events metric card is present", async () => {
     await renderAnalytics();
-    const value = screen.queryByText(/65%/);
-    expect(value || document.body).toBeTruthy();
+    expect(screen.getByTestId("metric-confirmed")).toBeInTheDocument();
   });
 
-  it("dismissed events metric card is present", async () => {
+  it("dismissed-events metric card is present", async () => {
     await renderAnalytics();
-    const card = document.querySelector("[data-testid='metric-dismissed']") ||
-      screen.queryByText(/644|dismissed/i);
-    expect(card || document.body).toBeTruthy();
+    expect(screen.getByTestId("metric-dismissed")).toBeInTheDocument();
   });
 
-  it("dismissed rate is shown as 35%", async () => {
+  it("turnaround metric card is present", async () => {
     await renderAnalytics();
-    const value = screen.queryByText(/35%/);
-    expect(value || document.body).toBeTruthy();
+    expect(screen.getByTestId("metric-turnaround")).toBeInTheDocument();
   });
 
-  it("average review turnaround metric card is present", async () => {
+  it("compliance metric card is present", async () => {
     await renderAnalytics();
-    const card = document.querySelector("[data-testid='metric-turnaround']") ||
-      screen.queryByText(/3\.2|turnaround/i);
-    expect(card || document.body).toBeTruthy();
+    expect(screen.getByTestId("metric-compliance")).toBeInTheDocument();
   });
 
-  it("average review turnaround value is 3.2 hrs", async () => {
+  it("compliance card shows percentage value", async () => {
     await renderAnalytics();
-    const value = screen.queryByText(/3\.2/);
-    expect(value || document.body).toBeTruthy();
-  });
-
-  it("average compliance metric card is present", async () => {
-    await renderAnalytics();
-    const card = document.querySelector("[data-testid='metric-compliance']") ||
-      screen.queryByText(/88%|avg.*compliance|average compliance/i);
-    expect(card || document.body).toBeTruthy();
-  });
-
-  it("average compliance value is 88%", async () => {
-    await renderAnalytics();
-    const value = screen.queryByText(/88%/);
-    expect(value || document.body).toBeTruthy();
+    const card = screen.getByTestId("metric-compliance");
+    expect(card.textContent).toMatch(/%/);
   });
 });
 
 describe("Population Analytics — charts", () => {
-  it("event volume over time chart is present", async () => {
+  it("event volume chart is present", async () => {
     await renderAnalytics();
-    const chart = document.querySelector("[data-testid='chart-event-volume']") ||
-      screen.queryByText(/event volume/i);
-    expect(chart || document.body).toBeTruthy();
-  });
-
-  it("event volume chart has a title", async () => {
-    await renderAnalytics();
-    const title = screen.queryByText(/event volume/i);
-    expect(title || document.body).toBeTruthy();
-  });
-
-  it("event volume chart data spans 90 days", async () => {
-    const { ANALYTICS } = await import("../data/analytics");
-    if (ANALYTICS?.eventVolume) {
-      expect(ANALYTICS.eventVolume.length === 90 || document.body).toBeTruthy();
-    }
-    expect(true).toBe(true);
+    expect(screen.getByTestId("chart-event-volume")).toBeInTheDocument();
   });
 
   it("classification breakdown chart is present", async () => {
     await renderAnalytics();
-    const chart = document.querySelector("[data-testid='chart-classification']") ||
-      screen.queryByText(/classification breakdown/i);
-    expect(chart || document.body).toBeTruthy();
+    expect(screen.getByTestId("chart-classification")).toBeInTheDocument();
   });
 
-  it("classification chart shows AF, Bradycardia, Tachycardia, and Pause slices", async () => {
+  it("turnaround distribution chart is present", async () => {
     await renderAnalytics();
-    const afLabel = screen.queryByText(/atrial fibrillation|AF/i);
-    expect(afLabel || document.body).toBeTruthy();
-  });
-
-  it("review turnaround histogram is present", async () => {
-    await renderAnalytics();
-    const chart = document.querySelector("[data-testid='chart-turnaround-dist']") ||
-      screen.queryByText(/turnaround/i);
-    expect(chart || document.body).toBeTruthy();
+    expect(screen.getByTestId("chart-turnaround-dist")).toBeInTheDocument();
   });
 
   it("compliance by patient chart is present", async () => {
     await renderAnalytics();
-    const chart = document.querySelector("[data-testid='chart-compliance-by-patient']") ||
-      screen.queryByText(/compliance by patient/i);
-    expect(chart || document.body).toBeTruthy();
-  });
-
-  it("compliance by patient chart is sorted ascending", async () => {
-    await renderAnalytics();
-    const { ANALYTICS } = await import("../data/analytics");
-    if (ANALYTICS?.complianceByPatient) {
-      const values = ANALYTICS.complianceByPatient.map(p => p.compliance || p.value || 0);
-      for (let i = 0; i < values.length - 1; i++) {
-        expect(values[i] <= values[i + 1] || values.length <= 1).toBeTruthy();
-      }
-    }
-    expect(true).toBe(true);
-  });
-
-  it("patient labels in the compliance chart are anonymized", async () => {
-    await renderAnalytics();
-    const { ANALYTICS } = await import("../data/analytics");
-    if (ANALYTICS?.complianceByPatient) {
-      ANALYTICS.complianceByPatient.forEach(p => {
-        const label = p.label || p.patient || "";
-        expect(!label.includes("Eleanor") && !label.includes("Marcus") || label === "").toBeTruthy();
-      });
-    }
-    expect(true).toBe(true);
-  });
-
-  it("all charts have labeled axes", async () => {
-    await renderAnalytics();
-    const axes = document.querySelectorAll(".recharts-cartesian-axis, [class*='axis']");
-    expect(axes.length >= 0 || document.body).toBeTruthy();
-  });
-
-  it("all charts render without errors", async () => {
-    const { container } = await renderAnalytics();
-    expect(container).toBeTruthy();
-  });
-
-  it("charts mount without throwing", async () => {
-    const { container } = await renderAnalytics();
-    expect(container.firstChild).toBeTruthy();
+    expect(screen.getByTestId("chart-compliance-by-patient")).toBeInTheDocument();
   });
 });
 
 describe("Population Analytics — export", () => {
-  it("a Data Export button is present", async () => {
+  it("Data Export button has correct label", async () => {
     await renderAnalytics();
-    const btn = document.querySelector("[data-testid='button-export']") ||
-      screen.queryByRole("button", { name: /export|data export/i });
-    expect(btn || document.body).toBeTruthy();
+    const btn = screen.getByTestId("button-export");
+    expect(btn.textContent).toMatch(/Data Export/i);
   });
 
-  it("clicking the Export button shows an export notification", async () => {
+  it("clicking Data Export button triggers export", async () => {
     const user = userEvent.setup();
     await renderAnalytics();
-    const exportBtn = document.querySelector("[data-testid='button-export']") as Element ||
-      screen.queryByRole("button", { name: /export|data export/i });
-    if (exportBtn) {
-      await user.click(exportBtn);
-      await waitFor(() => {
-        const notification = screen.queryByText(/export initiated|email|download/i);
-        expect(notification || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    const btn = screen.getByTestId("button-export");
+    await user.click(btn);
+    await waitFor(() => {
+      expect(btn).toBeDisabled();
+    }, { timeout: 500 });
   });
 
-  it("the analytics page is accessible from the sidebar navigation", async () => {
+  it("export button becomes re-enabled after export completes", async () => {
+    const user = userEvent.setup();
     await renderAnalytics();
-    expect(document.body).toBeTruthy();
-  });
-
-  it("the analytics page renders without data errors", async () => {
-    const { container } = await renderAnalytics();
-    expect(container).toBeTruthy();
+    const btn = screen.getByTestId("button-export");
+    await user.click(btn);
+    await waitFor(() => {
+      expect(btn).not.toBeDisabled();
+    }, { timeout: 3000 });
   });
 });

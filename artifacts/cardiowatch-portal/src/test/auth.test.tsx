@@ -1,20 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
-  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useLocation: vi.fn(() => ({ pathname: "/login", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
 async function renderLoginPage() {
@@ -26,192 +27,149 @@ async function renderLoginPage() {
 describe("Authentication — Login Screen", () => {
   it("login screen renders without crashing", async () => {
     const { container } = await renderLoginPage();
-    expect(container).toBeTruthy();
+    expect(container.firstChild).not.toBeNull();
   });
 
   it("CardioWatch AI logo is rendered", async () => {
     await renderLoginPage();
-    const logo = document.querySelector("[data-testid='logo-cardiowatch']");
-    expect(logo).toBeTruthy();
+    const logo = screen.getByTestId("logo-cardiowatch");
+    expect(logo).toBeInTheDocument();
   });
 
-  it("the page title is correct", async () => {
+  it("email field is present with testid", async () => {
     await renderLoginPage();
-    const titleMatch = document.title.match(/CardioWatch/i) ||
-      document.querySelector("h1, h2, [data-testid='logo-cardiowatch']")?.textContent?.match(/CardioWatch/i) ||
-      document.querySelector("title")?.textContent?.match(/CardioWatch/i);
-    expect(titleMatch || document.body).toBeTruthy();
+    const emailInput = screen.getByTestId("input-email");
+    expect(emailInput).toBeInTheDocument();
   });
 
-  it("email field is present", async () => {
+  it("email field has type email or text", async () => {
     await renderLoginPage();
-    const emailInput = document.querySelector("[data-testid='input-email']") ||
-      screen.queryByLabelText(/email/i) ||
-      screen.queryByPlaceholderText(/email/i);
-    expect(emailInput).toBeTruthy();
+    const emailInput = screen.getByTestId("input-email") as HTMLInputElement;
+    expect(["email", "text"]).toContain(emailInput.type);
   });
 
-  it("email field accepts input", async () => {
+  it("email field accepts typed input", async () => {
     const user = userEvent.setup();
     await renderLoginPage();
-    const emailInput = document.querySelector("[data-testid='input-email']") as HTMLInputElement ||
-      screen.queryByLabelText(/email/i) as HTMLInputElement;
-    if (emailInput) {
-      await user.type(emailInput, "doctor@hospital.org");
-      expect(emailInput.value).toBe("doctor@hospital.org");
-    } else {
-      expect(true).toBe(true);
-    }
+    const emailInput = screen.getByTestId("input-email") as HTMLInputElement;
+    await user.type(emailInput, "doctor@hospital.org");
+    expect(emailInput.value).toBe("doctor@hospital.org");
   });
 
-  it("password field is present", async () => {
+  it("password field is present with testid", async () => {
     await renderLoginPage();
-    const passwordInput = document.querySelector("[data-testid='input-password']") ||
-      screen.queryByLabelText(/password/i);
-    expect(passwordInput).toBeTruthy();
+    const passwordInput = screen.getByTestId("input-password");
+    expect(passwordInput).toBeInTheDocument();
   });
 
-  it("password field accepts input", async () => {
+  it("password field has type password (masks characters)", async () => {
+    await renderLoginPage();
+    const passwordInput = screen.getByTestId("input-password") as HTMLInputElement;
+    expect(passwordInput.type).toBe("password");
+  });
+
+  it("password field accepts typed input", async () => {
     const user = userEvent.setup();
     await renderLoginPage();
-    const passwordInput = document.querySelector("[data-testid='input-password']") as HTMLInputElement ||
-      screen.queryByLabelText(/password/i) as HTMLInputElement;
-    if (passwordInput) {
-      await user.type(passwordInput, "secretpass123");
-      expect(passwordInput.value).toBe("secretpass123");
-    } else {
-      expect(true).toBe(true);
-    }
+    const passwordInput = screen.getByTestId("input-password") as HTMLInputElement;
+    await user.type(passwordInput, "secretpass123");
+    expect(passwordInput.value).toBe("secretpass123");
   });
 
-  it("password field masks characters", async () => {
+  it("submit button is present", async () => {
     await renderLoginPage();
-    const passwordInput = document.querySelector("[data-testid='input-password']") as HTMLInputElement ||
-      screen.queryByLabelText(/password/i) as HTMLInputElement;
-    if (passwordInput) {
-      expect(passwordInput.type).toBe("password");
-    } else {
-      expect(true).toBe(true);
-    }
+    const submitBtn = screen.getByTestId("button-sign-in");
+    expect(submitBtn).toBeInTheDocument();
   });
 
-  it("password field type prevents characters from being visible", async () => {
+  it("submit button is labeled Sign In", async () => {
     await renderLoginPage();
-    const passwordInput = document.querySelector("[data-testid='input-password']") as HTMLInputElement;
-    if (passwordInput) {
-      expect(passwordInput.getAttribute("type")).toBe("password");
-    } else {
-      const allInputs = document.querySelectorAll("input");
-      const pwdField = Array.from(allInputs).find(i => i.type === "password");
-      expect(pwdField).toBeTruthy();
-    }
-  });
-
-  it("submit button is present and correctly labeled", async () => {
-    await renderLoginPage();
-    const submitBtn = document.querySelector("[data-testid='button-sign-in']") ||
-      screen.queryByRole("button", { name: /sign in/i });
-    expect(submitBtn).toBeTruthy();
+    const submitBtn = screen.getByTestId("button-sign-in");
+    expect(submitBtn.textContent).toMatch(/sign in/i);
   });
 
   it("forgot password link is present", async () => {
     await renderLoginPage();
-    const forgotLink = document.querySelector("[data-testid='link-forgot-password']") ||
-      screen.queryByText(/forgot password/i);
-    expect(forgotLink).toBeTruthy();
+    const forgotLink = screen.getByTestId("link-forgot-password");
+    expect(forgotLink).toBeInTheDocument();
   });
 
   it("authorized-use disclaimer text is present", async () => {
     await renderLoginPage();
-    const disclaimer = document.querySelector("[data-testid='text-disclaimer']") ||
-      screen.queryByText(/authorized clinical users only/i);
-    expect(disclaimer).toBeTruthy();
+    const disclaimer = screen.getByTestId("text-disclaimer");
+    expect(disclaimer).toBeInTheDocument();
+    expect(disclaimer.textContent).toMatch(/authorized clinical users only/i);
   });
 
-  it("email field has an accessible label", async () => {
-    await renderLoginPage();
-    const emailInput = screen.queryByLabelText(/email/i) ||
-      document.querySelector("[data-testid='input-email']");
-    expect(emailInput).toBeTruthy();
-  });
-
-  it("password field has an accessible label", async () => {
-    await renderLoginPage();
-    const passwordInput = screen.queryByLabelText(/password/i) ||
-      document.querySelector("[data-testid='input-password']");
-    expect(passwordInput).toBeTruthy();
-  });
-
-  it("submitting with empty email shows a validation error", async () => {
-    const user = userEvent.setup();
-    await renderLoginPage();
-    const emailInput = document.querySelector("[data-testid='input-password']") as HTMLInputElement;
-    if (emailInput) {
-      await user.type(emailInput, "pass123");
-    }
-    const submitBtn = document.querySelector("[data-testid='button-sign-in']") ||
-      screen.queryByRole("button", { name: /sign in/i });
-    if (submitBtn) {
-      await user.click(submitBtn as Element);
-    }
-    await waitFor(() => {
-      const errorMsg = document.querySelector("[data-testid='error-email']") ||
-        (screen.queryAllByText(/required|invalid|email/i)[0] ?? null);
-      expect(errorMsg || document.querySelector("form")).toBeTruthy();
-    }, { timeout: 2000 });
-  });
-
-  it("submitting with empty password shows a validation error", async () => {
-    const user = userEvent.setup();
-    await renderLoginPage();
-    const emailInput = document.querySelector("[data-testid='input-email']") as HTMLInputElement;
-    if (emailInput) {
-      await user.type(emailInput, "doctor@hospital.org");
-    }
-    const submitBtn = document.querySelector("[data-testid='button-sign-in']") ||
-      screen.queryByRole("button", { name: /sign in/i });
-    if (submitBtn) {
-      await user.click(submitBtn as Element);
-    }
-    await waitFor(() => {
-      const form = document.querySelector("form");
-      expect(form).toBeTruthy();
-    }, { timeout: 2000 });
-  });
-
-  it("submitting an empty form does not navigate", async () => {
+  it("submitting with empty fields does not navigate to dashboard", async () => {
     const user = userEvent.setup();
     const mockNavigate = vi.fn();
     const { useNavigate } = await import("react-router-dom");
     vi.mocked(useNavigate).mockReturnValue(mockNavigate);
     await renderLoginPage();
-    const submitBtn = document.querySelector("[data-testid='button-sign-in']") ||
-      screen.queryByRole("button", { name: /sign in/i });
-    if (submitBtn) {
-      await user.click(submitBtn as Element);
-    }
+    const submitBtn = screen.getByTestId("button-sign-in");
+    await user.click(submitBtn);
     await waitFor(() => {
       expect(mockNavigate).not.toHaveBeenCalledWith("/dashboard");
     }, { timeout: 1000 });
   });
 
-  it("submitting with non-empty credentials navigates to the dashboard", async () => {
+  it("submitting with valid credentials calls navigate to /dashboard", async () => {
     const user = userEvent.setup();
+    const mockNavigate = vi.fn();
+    const { useNavigate } = await import("react-router-dom");
+    vi.mocked(useNavigate).mockReturnValue(mockNavigate);
     await renderLoginPage();
-    const emailInput = document.querySelector("[data-testid='input-email']") as HTMLInputElement;
-    const passwordInput = document.querySelector("[data-testid='input-password']") as HTMLInputElement;
-    if (emailInput && passwordInput) {
-      await user.type(emailInput, "doctor@hospital.org");
-      await user.type(passwordInput, "password123");
-      const submitBtn = document.querySelector("[data-testid='button-sign-in']") ||
-        screen.queryByRole("button", { name: /sign in/i });
-      if (submitBtn) {
-        await user.click(submitBtn as Element);
-        await waitFor(() => {
-          expect(true).toBe(true);
-        }, { timeout: 2000 });
-      }
-    }
-    expect(true).toBe(true);
+    const emailInput = screen.getByTestId("input-email") as HTMLInputElement;
+    const passwordInput = screen.getByTestId("input-password") as HTMLInputElement;
+    await user.type(emailInput, "doctor@hospital.org");
+    await user.type(passwordInput, "password123");
+    const submitBtn = screen.getByTestId("button-sign-in");
+    await user.click(submitBtn);
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
+    }, { timeout: 2000 });
+  });
+
+  it("empty email field prevents navigation even with password filled", async () => {
+    const user = userEvent.setup();
+    const mockNavigate = vi.fn();
+    const { useNavigate } = await import("react-router-dom");
+    vi.mocked(useNavigate).mockReturnValue(mockNavigate);
+    await renderLoginPage();
+    const passwordInput = screen.getByTestId("input-password") as HTMLInputElement;
+    await user.type(passwordInput, "password123");
+    const submitBtn = screen.getByTestId("button-sign-in");
+    await user.click(submitBtn);
+    await waitFor(() => {
+      expect(mockNavigate).not.toHaveBeenCalledWith("/dashboard");
+    }, { timeout: 1000 });
+  });
+
+  it("empty password field prevents navigation even with email filled", async () => {
+    const user = userEvent.setup();
+    const mockNavigate = vi.fn();
+    const { useNavigate } = await import("react-router-dom");
+    vi.mocked(useNavigate).mockReturnValue(mockNavigate);
+    await renderLoginPage();
+    const emailInput = screen.getByTestId("input-email") as HTMLInputElement;
+    await user.type(emailInput, "doctor@hospital.org");
+    const submitBtn = screen.getByTestId("button-sign-in");
+    await user.click(submitBtn);
+    await waitFor(() => {
+      expect(mockNavigate).not.toHaveBeenCalledWith("/dashboard");
+    }, { timeout: 1000 });
+  });
+
+  it("page contains CardioWatch AI branding text", async () => {
+    await renderLoginPage();
+    const brandingText = screen.getAllByText(/CardioWatch AI/i);
+    expect(brandingText.length).toBeGreaterThan(0);
+  });
+
+  it("page contains Clinician Portal subtitle", async () => {
+    await renderLoginPage();
+    const subtitle = screen.getByText(/Clinician Portal/i);
+    expect(subtitle).toBeInTheDocument();
   });
 });

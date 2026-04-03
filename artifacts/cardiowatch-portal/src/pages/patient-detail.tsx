@@ -181,8 +181,8 @@ export default function PatientDetail({ params }: { params?: { id?: string } } =
           <form onSubmit={handleGenerateReport} className="space-y-6 py-4">
             <div className="space-y-3">
               <Label>Reporting Period</Label>
-              <Select defaultValue="30" data-testid="select-report-period">
-                <SelectTrigger>
+              <Select defaultValue="30">
+                <SelectTrigger data-testid="select-report-period">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -217,8 +217,8 @@ export default function PatientDetail({ params }: { params?: { id?: string } } =
 
             <div className="space-y-3">
               <Label>Recipient</Label>
-              <Select defaultValue="download" data-testid="select-recipient">
-                <SelectTrigger>
+              <Select defaultValue="download">
+                <SelectTrigger data-testid="select-recipient">
                   <SelectValue placeholder="Select recipient" />
                 </SelectTrigger>
                 <SelectContent>

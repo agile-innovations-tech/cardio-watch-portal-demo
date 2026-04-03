@@ -1,242 +1,199 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
-  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useLocation: vi.fn(() => ({ pathname: "/patients/1", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function renderPatientDetail(patientId = "1") {
+async function renderPatientDetail(id = "1") {
   const { default: PatientDetail } = await import("../pages/patient-detail");
-  return render(<PatientDetail params={{ id: patientId }} />);
+  return render(<PatientDetail params={{ id }} />);
 }
 
-describe("Patient Detail — Header and Navigation", () => {
-  it("patient detail screen renders without crashing", async () => {
+describe("Patient Detail — header and overview", () => {
+  it("patient detail page renders without crashing", async () => {
     const { container } = await renderPatientDetail();
-    expect(container).toBeTruthy();
+    expect(container.firstChild).not.toBeNull();
   });
 
-  it("patient name is displayed in the header", async () => {
-    await renderPatientDetail();
-    const header = document.querySelector("[data-testid='patient-header']");
-    expect(header || document.body).toBeTruthy();
+  it("Eleanor Voss name is displayed in the header", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getByText("Eleanor Voss")).toBeInTheDocument();
   });
 
-  it("patient MRN is displayed", async () => {
-    await renderPatientDetail();
-    const mrn = document.querySelector("[data-testid='patient-mrn']") ||
-      screen.queryByText(/mrn/i);
-    expect(mrn || document.body).toBeTruthy();
+  it("Eleanor Voss MRN is displayed", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getByText(/10042891/)).toBeInTheDocument();
   });
 
-  it("patient age and sex are displayed", async () => {
-    await renderPatientDetail();
-    const ageEl = document.querySelector("[data-testid='patient-age']") ||
-      screen.queryByText(/age|years|male|female/i);
-    expect(ageEl || document.body).toBeTruthy();
+  it("Eleanor Voss age is displayed", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getAllByText(/72/).length).toBeGreaterThan(0);
   });
 
-  it("diagnosis is displayed", async () => {
-    await renderPatientDetail();
-    const diagnosis = document.querySelector("[data-testid='patient-diagnosis']") ||
-      (screen.queryAllByText(/paroxysmal|af|brady|syncope|diagnosis/i)[0] ?? null);
-    expect(diagnosis || document.body).toBeTruthy();
+  it("Eleanor Voss diagnosis Paroxysmal AF is shown", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getAllByText(/Paroxysmal AF/i).length).toBeGreaterThan(0);
   });
 
-  it("monitoring start date is displayed", async () => {
-    await renderPatientDetail();
-    const startDate = document.querySelector("[data-testid='monitoring-start']") ||
-      screen.queryByText(/monitoring start|started|monitoring since/i);
-    expect(startDate || document.body).toBeTruthy();
+  it("Marcus Tran detail renders correctly", async () => {
+    const { useParams } = await import("react-router-dom");
+    vi.mocked(useParams).mockReturnValue({ id: "2" });
+    await renderPatientDetail("2");
+    expect(screen.getByText("Marcus Tran")).toBeInTheDocument();
   });
 
-  it("total monitoring days are displayed", async () => {
-    await renderPatientDetail();
-    const days = document.querySelector("[data-testid='monitoring-days']") ||
-      screen.queryByText(/days|monitoring duration/i);
-    expect(days || document.body).toBeTruthy();
+  it("generate report button is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getByTestId("button-generate-report")).toBeInTheDocument();
   });
 
-  it("device model is displayed", async () => {
-    await renderPatientDetail();
-    const device = document.querySelector("[data-testid='device-model']") ||
-      (screen.queryAllByText(/apple watch|watch|device/i)[0] ?? null);
-    expect(device || document.body).toBeTruthy();
+  it("message team button is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getByTestId("button-message-team")).toBeInTheDocument();
   });
 
-  it("battery percentage is displayed", async () => {
-    await renderPatientDetail();
-    const battery = document.querySelector("[data-testid='device-battery']") ||
-      (screen.queryAllByText(/battery|%/i)[0] ?? null);
-    expect(battery || document.body).toBeTruthy();
+  it("adjust thresholds button is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getByTestId("button-adjust-thresholds")).toBeInTheDocument();
   });
 
-  it("last sync time is displayed", async () => {
-    await renderPatientDetail();
-    const syncTime = document.querySelector("[data-testid='device-last-sync']") ||
-      screen.queryByText(/last sync|synced|ago/i);
-    expect(syncTime || document.body).toBeTruthy();
+  it("nonexistent patient ID shows not found message", async () => {
+    await renderPatientDetail("999");
+    expect(screen.getByText(/Patient not found/i)).toBeInTheDocument();
+  });
+});
+
+describe("Patient Detail — tabs", () => {
+  it("Events tab is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getAllByText(/Events/i).length).toBeGreaterThan(0);
   });
 
-  it("Generate Report button is present", async () => {
-    await renderPatientDetail();
-    const btn = document.querySelector("[data-testid='button-generate-report']") ||
-      screen.queryByRole("button", { name: /generate report/i });
-    expect(btn || document.body).toBeTruthy();
+  it("ECG Viewer tab is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getAllByText(/ECG Viewer/i).length).toBeGreaterThan(0);
   });
 
-  it("Adjust Thresholds button is present", async () => {
-    await renderPatientDetail();
-    const btn = document.querySelector("[data-testid='button-adjust-thresholds']") ||
-      screen.queryByRole("button", { name: /adjust threshold|threshold/i });
-    expect(btn || document.body).toBeTruthy();
+  it("Trends tab is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getAllByText(/Trends/i).length).toBeGreaterThan(0);
   });
 
-  it("Message Care Team button is present", async () => {
-    await renderPatientDetail();
-    const btn = document.querySelector("[data-testid='button-message-care-team']") ||
-      screen.queryByRole("button", { name: /message care team|message|care team/i });
-    expect(btn || document.body).toBeTruthy();
+  it("History tab is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getAllByText(/History/i).length).toBeGreaterThan(0);
   });
 
-  it("tab navigation is present", async () => {
-    await renderPatientDetail();
-    const tabs = document.querySelector("[data-testid='patient-tabs']") ||
-      document.querySelector("[role='tablist']");
-    expect(tabs || document.body).toBeTruthy();
+  it("Settings tab is present", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getAllByText(/Settings/i).length).toBeGreaterThan(0);
   });
 
-  it("the Events tab is active by default", async () => {
-    await renderPatientDetail();
-    const eventsTab = document.querySelector("[data-testid='tab-events']") ||
-      screen.queryByRole("tab", { name: /events/i });
-    expect(eventsTab || document.body).toBeTruthy();
+  it("Events tab is active by default and shows event filter", async () => {
+    await renderPatientDetail("1");
+    await waitFor(() => {
+      expect(screen.getByTestId("select-event-filter")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("clicking the ECG Viewer tab makes it the active tab", async () => {
+  it("clicking Trends tab shows trend charts", async () => {
     const user = userEvent.setup();
-    await renderPatientDetail();
-    const ecgTab = document.querySelector("[data-testid='tab-ecg-viewer']") ||
-      screen.queryByRole("tab", { name: /ecg viewer/i }) ||
-      screen.queryByText(/ecg viewer/i);
-    if (ecgTab) {
-      await user.click(ecgTab as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    await renderPatientDetail("1");
+    const trendsTab = screen.getByRole("tab", { name: /Trends/i });
+    await user.click(trendsTab);
+    await waitFor(() => {
+      expect(screen.getByTestId("chart-af-burden")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("clicking the Trends tab makes it the active tab", async () => {
+  it("clicking ECG Viewer tab shows ecg waveform", async () => {
     const user = userEvent.setup();
-    await renderPatientDetail();
-    const trendsTab = document.querySelector("[data-testid='tab-trends']") ||
-      screen.queryByRole("tab", { name: /trends/i }) ||
-      screen.queryByText(/trends/i);
-    if (trendsTab) {
-      await user.click(trendsTab as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    await renderPatientDetail("1");
+    const ecgTab = screen.getByRole("tab", { name: /ECG Viewer/i });
+    await user.click(ecgTab);
+    await waitFor(() => {
+      expect(screen.getByTestId("ecg-waveform")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("clicking the History tab makes it the active tab", async () => {
+  it("clicking History tab shows history list", async () => {
     const user = userEvent.setup();
-    await renderPatientDetail();
-    const historyTab = document.querySelector("[data-testid='tab-history']") ||
-      screen.queryByRole("tab", { name: /history/i }) ||
-      screen.queryByText(/history/i);
-    if (historyTab) {
-      await user.click(historyTab as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    await renderPatientDetail("1");
+    const historyTab = screen.getByRole("tab", { name: /History/i });
+    await user.click(historyTab);
+    await waitFor(() => {
+      expect(screen.getByTestId("history-list")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("clicking the Settings tab makes it the active tab", async () => {
+  it("clicking Settings tab shows monitoring settings", async () => {
     const user = userEvent.setup();
-    await renderPatientDetail();
-    const settingsTab = document.querySelector("[data-testid='tab-settings']") ||
-      screen.queryByRole("tab", { name: /settings/i }) ||
-      screen.queryByText(/settings/i);
-    if (settingsTab) {
-      await user.click(settingsTab as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    await renderPatientDetail("1");
+    const settingsTab = screen.getByRole("tab", { name: /Settings/i });
+    await user.click(settingsTab);
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-monitoring-paused")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
+});
 
-  it("clicking back to Events tab re-renders the event list", async () => {
+describe("Patient Detail — report generation modal", () => {
+  it("clicking generate report button opens the modal", async () => {
     const user = userEvent.setup();
-    await renderPatientDetail();
-    const trendsTab = screen.queryByRole("tab", { name: /trends/i }) || screen.queryByText(/trends/i);
-    const eventsTab = document.querySelector("[data-testid='tab-events']") || screen.queryByRole("tab", { name: /events/i });
-    if (trendsTab && eventsTab) {
-      await user.click(trendsTab as Element);
-      await user.click(eventsTab as Element);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    await renderPatientDetail("1");
+    await user.click(screen.getByTestId("button-generate-report"));
+    await waitFor(() => {
+      expect(screen.getByTestId("report-modal")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("the patient header persists across all tab changes", async () => {
+  it("report modal shows select-report-period dropdown", async () => {
     const user = userEvent.setup();
-    await renderPatientDetail();
-    const header = document.querySelector("[data-testid='patient-header']");
-    const trendsTab = screen.queryByRole("tab", { name: /trends/i }) || screen.queryByText(/trends/i);
-    if (trendsTab) {
-      await user.click(trendsTab as Element);
-      await waitFor(() => {
-        const headerStillPresent = document.querySelector("[data-testid='patient-header']");
-        expect(headerStillPresent || header || document.body).toBeTruthy();
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    await renderPatientDetail("1");
+    await user.click(screen.getByTestId("button-generate-report"));
+    await waitFor(() => {
+      expect(screen.getByTestId("select-report-period")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("an invalid patient identifier shows an error state", async () => {
-    const { container } = await renderPatientDetail("invalid-99999");
-    expect(container).toBeTruthy();
+  it("report modal shows checkbox for summary", async () => {
+    const user = userEvent.setup();
+    await renderPatientDetail("1");
+    await user.click(screen.getByTestId("button-generate-report"));
+    await waitFor(() => {
+      expect(screen.getByTestId("checkbox-summary")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("the page title reflects the patient's name", async () => {
-    await renderPatientDetail();
-    expect(document.title || document.body).toBeTruthy();
+  it("report modal has generate button", async () => {
+    const user = userEvent.setup();
+    await renderPatientDetail("1");
+    await user.click(screen.getByTestId("button-generate-report"));
+    await waitFor(() => {
+      expect(screen.getByTestId("button-generate")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("the assigned clinician's name is displayed", async () => {
-    await renderPatientDetail();
-    const clinician = document.querySelector("[data-testid='assigned-clinician']") ||
-      screen.queryByText(/dr\.|okonkwo|ritter|calás|park/i);
-    expect(clinician || document.body).toBeTruthy();
-  });
-
-  it("navigation back to the dashboard is available", async () => {
-    await renderPatientDetail();
-    const backLink = document.querySelector("[data-testid='nav-back']") ||
-      screen.queryByRole("link", { name: /back|dashboard/i }) ||
-      screen.queryByText(/back|dashboard/i);
-    expect(backLink || document.body).toBeTruthy();
+  it("report modal has cancel button", async () => {
+    const user = userEvent.setup();
+    await renderPatientDetail("1");
+    await user.click(screen.getByTestId("button-generate-report"));
+    await waitFor(() => {
+      expect(screen.getByTestId("button-cancel-report")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 });

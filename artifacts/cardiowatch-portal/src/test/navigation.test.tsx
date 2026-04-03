@@ -1,234 +1,225 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
   useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function renderApp() {
-  const { default: App } = await import("../App");
-  return render(<App />);
-}
-
 async function renderSidebar() {
-  try {
-    const { Sidebar } = await import("../components/Sidebar");
-    return render(<Sidebar isCollapsed={false} onToggle={vi.fn()} />);
-  } catch {
-    try {
-      const { default: Dashboard } = await import("../pages/dashboard");
-      return render(<Dashboard />);
-    } catch {
-      return renderApp();
-    }
-  }
+  const { Sidebar } = await import("../components/layout/sidebar");
+  return render(<Sidebar />);
 }
 
 async function renderHeader() {
-  try {
-    const { Header } = await import("../components/Header");
-    return render(<Header onNotificationClick={vi.fn()} unreadCount={5} />);
-  } catch {
-    try {
-      const { default: Dashboard } = await import("../pages/dashboard");
-      return render(<Dashboard />);
-    } catch {
-      return renderApp();
-    }
-  }
+  const { Header } = await import("../components/layout/header");
+  const { AuthProvider } = await import("../lib/auth-context");
+  return render(<AuthProvider><Header /></AuthProvider>);
 }
 
 describe("Navigation — sidebar", () => {
-  it("the sidebar renders without crashing", async () => {
+  it("sidebar renders without crashing", async () => {
     const { container } = await renderSidebar();
-    expect(container).toBeTruthy();
+    expect(container.firstChild).not.toBeNull();
   });
 
-  it("the sidebar has a data-testid attribute", async () => {
+  it("sidebar has data-testid='sidebar'", async () => {
     await renderSidebar();
-    const sidebar = document.querySelector("[data-testid='sidebar']");
-    expect(sidebar || document.body).toBeTruthy();
+    expect(screen.getByTestId("sidebar")).toBeInTheDocument();
   });
 
-  it("a Dashboard navigation link is present", async () => {
+  it("Dashboard nav link is present with testid", async () => {
     await renderSidebar();
-    const link = document.querySelector("[data-testid='nav-dashboard']") ||
-      screen.queryByRole("link", { name: /dashboard/i }) ||
-      screen.queryByText(/dashboard/i);
-    expect(link || document.body).toBeTruthy();
+    expect(screen.getByTestId("nav-dashboard")).toBeInTheDocument();
   });
 
-  it("an Analytics navigation link is present", async () => {
+  it("Analytics nav link is present with testid", async () => {
     await renderSidebar();
-    const link = document.querySelector("[data-testid='nav-analytics']") ||
-      screen.queryByRole("link", { name: /analytics/i }) ||
-      screen.queryByText(/analytics/i);
-    expect(link || document.body).toBeTruthy();
+    expect(screen.getByTestId("nav-analytics")).toBeInTheDocument();
   });
 
-  it("a Settings navigation link is present", async () => {
+  it("Settings nav link is present with testid", async () => {
     await renderSidebar();
-    const link = document.querySelector("[data-testid='nav-settings']") ||
-      screen.queryByRole("link", { name: /settings/i }) ||
-      screen.queryByText(/settings/i);
-    expect(link || document.body).toBeTruthy();
+    expect(screen.getByTestId("nav-settings")).toBeInTheDocument();
   });
 
-  it("the CardioWatch AI logo or branding is present in the sidebar", async () => {
+  it("Dashboard nav link anchor points to /dashboard", async () => {
     await renderSidebar();
-    const logo = document.querySelector("[data-testid='sidebar-logo']") ||
-      screen.queryByText(/cardiowatch/i);
-    expect(logo || document.body).toBeTruthy();
+    const dashLink = screen.getByTestId("nav-dashboard").closest("a");
+    expect(dashLink).not.toBeNull();
+    expect(dashLink?.getAttribute("href")).toBe("/dashboard");
   });
 
-  it("the active Dashboard link is visually highlighted when on the dashboard route", async () => {
+  it("Analytics nav link anchor points to /analytics", async () => {
     await renderSidebar();
-    const dashLink = document.querySelector("[data-testid='nav-dashboard']");
-    if (dashLink) {
-      const isActive = dashLink.className.includes("active") ||
-        dashLink.getAttribute("aria-current") === "page" ||
-        dashLink.className.includes("selected");
-      expect(isActive || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
+    const analyticsLink = screen.getByTestId("nav-analytics").closest("a");
+    expect(analyticsLink).not.toBeNull();
+    expect(analyticsLink?.getAttribute("href")).toBe("/analytics");
   });
 
-  it("a sidebar collapse/expand button is present", async () => {
+  it("Settings nav link anchor points to /settings", async () => {
     await renderSidebar();
-    const collapseBtn = document.querySelector("[data-testid='button-collapse-sidebar']") ||
-      screen.queryByRole("button", { name: /collapse|expand|toggle sidebar/i });
-    expect(collapseBtn || document.body).toBeTruthy();
+    const settingsLink = screen.getByTestId("nav-settings").closest("a");
+    expect(settingsLink).not.toBeNull();
+    expect(settingsLink?.getAttribute("href")).toBe("/settings");
   });
 
-  it("clicking the collapse button hides sidebar navigation text", async () => {
+  it("CardioWatch AI branding text appears in sidebar", async () => {
+    await renderSidebar();
+    expect(screen.getByText("CardioWatch AI")).toBeInTheDocument();
+  });
+
+  it("collapse button is present", async () => {
+    await renderSidebar();
+    expect(screen.getByTestId("button-collapse-sidebar")).toBeInTheDocument();
+  });
+
+  it("clicking collapse hides Dashboard text label", async () => {
     const user = userEvent.setup();
     await renderSidebar();
-    const collapseBtn = document.querySelector("[data-testid='button-collapse-sidebar']") as Element ||
-      screen.queryByRole("button", { name: /collapse|toggle/i });
-    if (collapseBtn) {
-      await user.click(collapseBtn);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    await user.click(screen.getByTestId("button-collapse-sidebar"));
+    await waitFor(() => {
+      expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+    }, { timeout: 1000 });
   });
 
-  it("clicking the expand button restores the sidebar", async () => {
+  it("clicking collapse then expand restores Dashboard label", async () => {
     const user = userEvent.setup();
     await renderSidebar();
-    const collapseBtn = document.querySelector("[data-testid='button-collapse-sidebar']") as Element;
-    if (collapseBtn) {
-      await user.click(collapseBtn);
-      await user.click(collapseBtn);
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    const btn = screen.getByTestId("button-collapse-sidebar");
+    await user.click(btn);
+    await waitFor(() => {
+      expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+    });
+    await user.click(btn);
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    }, { timeout: 1000 });
   });
 
-  it("sidebar links are accessible with proper aria attributes or roles", async () => {
+  it("Dashboard nav item has active styling when pathname is /dashboard", async () => {
     await renderSidebar();
-    const links = document.querySelectorAll("nav a, [role='navigation'] a");
-    expect(links.length >= 0 || document.body).toBeTruthy();
+    const dashItem = screen.getByTestId("nav-dashboard");
+    expect(dashItem.className).toMatch(/font-medium/);
+  });
+
+  it("Analytics nav item does NOT have active styling when pathname is /dashboard", async () => {
+    await renderSidebar();
+    const analyticsItem = screen.getByTestId("nav-analytics");
+    expect(analyticsItem.className).not.toMatch(/font-medium/);
+  });
+
+  it("sidebar contains a nav element", async () => {
+    await renderSidebar();
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
+  });
+
+  it("sidebar nav shows three navigation items", async () => {
+    await renderSidebar();
+    const navItems = [
+      screen.getByTestId("nav-dashboard"),
+      screen.getByTestId("nav-analytics"),
+      screen.getByTestId("nav-settings"),
+    ];
+    expect(navItems).toHaveLength(3);
   });
 });
 
 describe("Navigation — header", () => {
-  it("the header renders without crashing", async () => {
+  it("header renders without crashing", async () => {
     const { container } = await renderHeader();
-    expect(container).toBeTruthy();
+    expect(container.firstChild).not.toBeNull();
   });
 
-  it("the header has a data-testid attribute", async () => {
+  it("header has data-testid='header'", async () => {
     await renderHeader();
-    const header = document.querySelector("[data-testid='header']");
-    expect(header || document.body).toBeTruthy();
+    expect(screen.getByTestId("header")).toBeInTheDocument();
   });
 
-  it("the practice name is shown in the header", async () => {
+  it("Northgate Cardiac Institute practice name is shown", async () => {
     await renderHeader();
-    const practiceEl = screen.queryByText(/northgate cardiac institute/i);
-    expect(practiceEl || document.body).toBeTruthy();
+    expect(screen.getByText("Northgate Cardiac Institute")).toBeInTheDocument();
   });
 
-  it("the clinician's name is shown in the header", async () => {
+  it("clinician name Dr. Sarah Okonkwo is shown", async () => {
     await renderHeader();
-    const nameEl = screen.queryByText(/okonkwo|dr\. sarah|dr\./i);
-    expect(nameEl || document.body).toBeTruthy();
+    expect(screen.getByText("Dr. Sarah Okonkwo, MD")).toBeInTheDocument();
   });
 
-  it("the user menu is accessible from the header", async () => {
+  it("notification bell has testid", async () => {
     await renderHeader();
-    const userMenu = document.querySelector("[data-testid='user-menu']") ||
-      screen.queryByRole("button", { name: /user menu|profile|account/i });
-    expect(userMenu || document.body).toBeTruthy();
+    expect(screen.getByTestId("notification-bell")).toBeInTheDocument();
   });
 
-  it("the role switcher is present in the user menu or header", async () => {
+  it("notification badge shows unread count", async () => {
+    await renderHeader();
+    const badge = screen.getByTestId("notification-badge");
+    expect(badge).toBeInTheDocument();
+    const count = parseInt(badge.textContent || "0");
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it("user menu trigger has testid", async () => {
+    await renderHeader();
+    expect(screen.getByTestId("user-menu")).toBeInTheDocument();
+  });
+
+  it("clicking notification bell opens the notification drawer", async () => {
     const user = userEvent.setup();
     await renderHeader();
-    const userMenu = document.querySelector("[data-testid='user-menu']") as Element;
-    if (userMenu) {
-      await user.click(userMenu);
-      await waitFor(() => {
-        const switcher = document.querySelector("[data-testid='role-switcher']") ||
-          screen.queryByText(/clinician|admin/i);
-        expect(switcher || document.body).toBeTruthy();
-      }, { timeout: 1000 });
-    } else {
-      const switcher = document.querySelector("[data-testid='role-switcher']") ||
-        screen.queryByText(/clinician|admin/i);
-      expect(switcher || document.body).toBeTruthy();
-    }
-  });
-});
-
-describe("Navigation — role switcher", () => {
-  it("switching to Admin role shows the Practice Administration section", async () => {
-    const user = userEvent.setup();
-    const { default: SettingsPage } = await import("../pages/settings");
-    const { AuthProvider } = await import("../lib/auth-context");
-    render(<AuthProvider><SettingsPage /></AuthProvider>);
-    const roleSwitcher = document.querySelector("[data-testid='role-switcher']") as HTMLSelectElement;
-    if (roleSwitcher) {
-      fireEvent.change(roleSwitcher, { target: { value: "admin" } });
-      await waitFor(() => {
-        const practiceSection = document.querySelector("[data-testid='practice-admin-section']") ||
-          screen.queryByText(/practice administration/i);
-        expect(practiceSection || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    await user.click(screen.getByTestId("notification-bell"));
+    await waitFor(() => {
+      expect(screen.getByTestId("notification-drawer")).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
-  it("in Clinician role the Practice Administration section is hidden", async () => {
+  it("notification drawer shows Notifications heading when open", async () => {
     const user = userEvent.setup();
-    const { default: SettingsPage } = await import("../pages/settings");
-    const { AuthProvider } = await import("../lib/auth-context");
-    render(<AuthProvider><SettingsPage /></AuthProvider>);
-    const roleSwitcher = document.querySelector("[data-testid='role-switcher']") as HTMLSelectElement;
-    if (roleSwitcher) {
-      fireEvent.change(roleSwitcher, { target: { value: "clinician" } });
-      await waitFor(() => {
-        expect(true).toBe(true);
-      }, { timeout: 1000 });
-    }
-    expect(true).toBe(true);
+    await renderHeader();
+    await user.click(screen.getByTestId("notification-bell"));
+    await waitFor(() => {
+      expect(screen.getByText("Notifications")).toBeInTheDocument();
+    }, { timeout: 2000 });
+  });
+
+  it("notification drawer has Mark all read button", async () => {
+    const user = userEvent.setup();
+    await renderHeader();
+    await user.click(screen.getByTestId("notification-bell"));
+    await waitFor(() => {
+      expect(screen.getByTestId("button-mark-all-read")).toBeInTheDocument();
+    }, { timeout: 2000 });
+  });
+
+  it("role-switcher menu item is present in user dropdown", async () => {
+    const user = userEvent.setup();
+    await renderHeader();
+    await user.click(screen.getByTestId("user-menu"));
+    await waitFor(() => {
+      expect(screen.getByTestId("role-switcher")).toBeInTheDocument();
+    }, { timeout: 2000 });
+  });
+
+  it("role-switcher menu item shows current role toggle", async () => {
+    const user = userEvent.setup();
+    await renderHeader();
+    await user.click(screen.getByTestId("user-menu"));
+    await waitFor(() => {
+      const switcher = screen.getByTestId("role-switcher");
+      expect(switcher.textContent).toMatch(/Admin|Clinician/i);
+    }, { timeout: 2000 });
   });
 });

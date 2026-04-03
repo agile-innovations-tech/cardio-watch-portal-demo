@@ -1,314 +1,207 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
-  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useLocation: vi.fn(() => ({ pathname: "/patients/1", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function renderWithReportModal() {
-  try {
-    const { ReportModal } = await import("../components/ReportModal");
-    return render(<ReportModal isOpen={true} onClose={vi.fn()} patientId="1" />);
-  } catch {
-    try {
-      const { default: PatientDetail } = await import("../pages/patient-detail");
-      const result = render(<PatientDetail params={{ id: "1" }} />);
-      const generateReportBtn = document.querySelector("[data-testid='button-generate-report']") ||
-        screen.queryByRole("button", { name: /generate report/i });
-      if (generateReportBtn) {
-        fireEvent.click(generateReportBtn as Element);
-      }
-      return result;
-    } catch {
-      const { default: App } = await import("../App");
-      return render(<App />);
-    }
-  }
+async function renderReportModal(patientId = "1", isOpen = true) {
+  const { ReportModal } = await import("../components/ReportModal");
+  const onClose = vi.fn();
+  const result = render(<ReportModal isOpen={isOpen} onClose={onClose} patientId={patientId} />);
+  return { ...result, onClose };
 }
 
-describe("Report Generation Modal — rendering", () => {
-  it("clicking Generate Report opens the modal", async () => {
-    const user = userEvent.setup();
-    const { default: PatientDetail } = await import("../pages/patient-detail");
-    render(<PatientDetail params={{ id: "1" }} />);
-    const btn = document.querySelector("[data-testid='button-generate-report']") ||
-      screen.queryByRole("button", { name: /generate report/i });
-    if (btn) {
-      await user.click(btn as Element);
-      await waitFor(() => {
-        const modal = document.querySelector("[data-testid='report-modal']") ||
-          screen.queryByRole("dialog") ||
-          screen.queryByText(/generate report|report period/i);
-        expect(modal || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+async function renderPatientDetail(id = "1") {
+  const { default: PatientDetail } = await import("../pages/patient-detail");
+  return render(<PatientDetail params={{ id }} />);
+}
+
+async function openReportModalFromPatientDetail(id = "1") {
+  const user = userEvent.setup();
+  await renderPatientDetail(id);
+  await user.click(screen.getByTestId("button-generate-report"));
+  await waitFor(() => {
+    expect(screen.getByTestId("report-modal")).toBeInTheDocument();
+  }, { timeout: 2000 });
+  return user;
+}
+
+describe("Report Generation — modal component (direct render)", () => {
+  it("report modal renders when isOpen=true", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("report-modal")).toBeInTheDocument();
   });
 
-  it("the report modal is visible when rendered open", async () => {
-    await renderWithReportModal();
-    const modal = document.querySelector("[data-testid='report-modal']") ||
-      screen.queryByRole("dialog") ||
-      screen.queryByText(/generate report|report period/i);
-    expect(modal || document.body).toBeTruthy();
+  it("report modal shows Generate Clinical Report heading", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByText(/Generate Clinical Report/i)).toBeInTheDocument();
   });
 
-  it("the report modal has a title", async () => {
-    await renderWithReportModal();
-    const title = screen.queryByText(/generate report/i);
-    expect(title || document.body).toBeTruthy();
+  it("report-modal shows patient name Eleanor Voss", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByText(/Eleanor Voss/)).toBeInTheDocument();
   });
 
-  it("a report period selector is present", async () => {
-    await renderWithReportModal();
-    const selector = document.querySelector("[data-testid='select-report-period']") ||
-      screen.queryByLabelText(/period|report period/i);
-    expect(selector || document.body).toBeTruthy();
+  it("report modal shows reporting period select trigger", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("select-report-period")).toBeInTheDocument();
   });
 
-  it("the period selector includes Last 7 days option", async () => {
-    await renderWithReportModal();
-    const option = screen.queryByText(/last 7 days|7 days/i);
-    expect(option || document.body).toBeTruthy();
+  it("report modal shows recipient select trigger", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("select-recipient")).toBeInTheDocument();
   });
 
-  it("the period selector includes Last 30 days option", async () => {
-    await renderWithReportModal();
-    const option = (screen.queryAllByText(/last 30 days|30 days/i)[0] ?? null);
-    expect(option || document.body).toBeTruthy();
+  it("report modal shows summary checkbox", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("checkbox-summary")).toBeInTheDocument();
   });
 
-  it("selecting Custom Range reveals date input fields", async () => {
-    const user = userEvent.setup();
-    await renderWithReportModal();
-    const periodSelector = document.querySelector("[data-testid='select-report-period']") as HTMLSelectElement;
-    if (periodSelector) {
-      fireEvent.change(periodSelector, { target: { value: "custom" } });
-      await waitFor(() => {
-        const dateInputs = document.querySelectorAll("[type='date']");
-        expect(dateInputs.length >= 0 || document.body).toBeTruthy();
-      }, { timeout: 1000 });
-    } else {
-      const customText = screen.queryByText(/custom/i);
-      if (customText) {
-        await user.click(customText);
-      }
-      expect(true).toBe(true);
-    }
+  it("report modal shows event log checkbox", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("checkbox-event-log")).toBeInTheDocument();
   });
 
-  it("a Summary section checkbox is present and checked by default", async () => {
-    await renderWithReportModal();
-    const checkboxEl = document.querySelector("[data-testid='checkbox-summary']") ||
-      document.querySelector("input[type='checkbox']");
-    const roleCheckbox = screen.queryByRole("checkbox", { name: /summary/i });
-    const checkbox = (checkboxEl instanceof HTMLInputElement ? checkboxEl : null) ||
-      (roleCheckbox instanceof HTMLInputElement ? roleCheckbox : null);
-    if (checkbox) {
-      expect(checkbox.checked || true).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
+  it("report modal shows ECG excerpts checkbox", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("checkbox-ecg-excerpts")).toBeInTheDocument();
   });
 
-  it("an Event Log checkbox is present", async () => {
-    await renderWithReportModal();
-    const checkbox = document.querySelector("[data-testid='checkbox-event-log']") ||
-      screen.queryByRole("checkbox", { name: /event log/i }) ||
-      screen.queryByLabelText(/event log/i);
-    expect(checkbox || document.body).toBeTruthy();
+  it("report modal shows trend charts checkbox", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("checkbox-trend-charts")).toBeInTheDocument();
   });
 
-  it("an ECG Excerpts checkbox is present", async () => {
-    await renderWithReportModal();
-    const checkbox = document.querySelector("[data-testid='checkbox-ecg-excerpts']") ||
-      screen.queryByRole("checkbox", { name: /ecg excerpts|ecg/i }) ||
-      screen.queryByLabelText(/ecg excerpts/i);
-    expect(checkbox || document.body).toBeTruthy();
+  it("report modal shows generate button", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("button-generate")).toBeInTheDocument();
   });
 
-  it("a Trend Charts checkbox is present", async () => {
-    await renderWithReportModal();
-    const checkbox = document.querySelector("[data-testid='checkbox-trend-charts']") ||
-      screen.queryByRole("checkbox", { name: /trend charts|trends/i }) ||
-      screen.queryByLabelText(/trend charts/i);
-    expect(checkbox || document.body).toBeTruthy();
-  });
-
-  it("a recipient selector is present", async () => {
-    await renderWithReportModal();
-    const selector = document.querySelector("[data-testid='select-recipient']") ||
-      screen.queryByLabelText(/recipient/i);
-    expect(selector || document.body).toBeTruthy();
-  });
-
-  it("recipient options include Ordering Physician", async () => {
-    await renderWithReportModal();
-    const option = screen.queryByText(/ordering physician/i);
-    expect(option || document.body).toBeTruthy();
-  });
-
-  it("recipient options include Referring Specialist", async () => {
-    await renderWithReportModal();
-    const option = screen.queryByText(/referring specialist/i);
-    expect(option || document.body).toBeTruthy();
-  });
-
-  it("recipient options include Insurance / Prior Auth", async () => {
-    await renderWithReportModal();
-    const option = screen.queryByText(/insurance|prior auth/i);
-    expect(option || document.body).toBeTruthy();
-  });
-
-  it("recipient options include Download Only", async () => {
-    await renderWithReportModal();
-    const option = (screen.queryAllByText(/download only/i)[0] ?? null);
-    expect(option || document.body).toBeTruthy();
-  });
-
-  it("a Generate button is present", async () => {
-    await renderWithReportModal();
-    const btn = document.querySelector("[data-testid='button-generate']") ||
-      screen.queryByRole("button", { name: /^generate$/i });
-    expect(btn || document.body).toBeTruthy();
-  });
-
-  it("a Cancel button is present", async () => {
-    await renderWithReportModal();
-    const btn = document.querySelector("[data-testid='button-cancel-report']") ||
-      screen.queryByRole("button", { name: /cancel/i });
-    expect(btn || document.body).toBeTruthy();
+  it("report modal shows cancel button", async () => {
+    await renderReportModal("1", true);
+    expect(screen.getByTestId("button-cancel-report")).toBeInTheDocument();
   });
 });
 
-describe("Report Generation Modal — interaction", () => {
-  it("clicking Cancel closes the modal without generating a report", async () => {
+describe("Report Generation — checkbox defaults", () => {
+  it("summary checkbox is checked by default", async () => {
+    await renderReportModal("1", true);
+    const checkbox = screen.getByTestId("checkbox-summary");
+    expect(checkbox.getAttribute("data-state")).toBe("checked");
+  });
+
+  it("event log checkbox is checked by default", async () => {
+    await renderReportModal("1", true);
+    const checkbox = screen.getByTestId("checkbox-event-log");
+    expect(checkbox.getAttribute("data-state")).toBe("checked");
+  });
+
+  it("trend charts checkbox is checked by default", async () => {
+    await renderReportModal("1", true);
+    const checkbox = screen.getByTestId("checkbox-trend-charts");
+    expect(checkbox.getAttribute("data-state")).toBe("checked");
+  });
+
+  it("summary checkbox can be unchecked", async () => {
     const user = userEvent.setup();
-    const mockOnClose = vi.fn();
-    try {
-      const { ReportModal } = await import("../components/ReportModal");
-      render(<ReportModal isOpen={true} onClose={mockOnClose} patientId="1" />);
-      const cancelBtn = document.querySelector("[data-testid='button-cancel-report']") as Element ||
-        screen.queryByRole("button", { name: /cancel/i });
-      if (cancelBtn) {
-        await user.click(cancelBtn);
-        await waitFor(() => {
-          expect(mockOnClose).toHaveBeenCalled();
-        }, { timeout: 1000 });
-      } else {
-        expect(true).toBe(true);
-      }
-    } catch {
-      expect(true).toBe(true);
-    }
+    await renderReportModal("1", true);
+    const checkbox = screen.getByTestId("checkbox-summary");
+    expect(checkbox.getAttribute("data-state")).toBe("checked");
+    await user.click(checkbox);
+    await waitFor(() => {
+      expect(checkbox.getAttribute("data-state")).toBe("unchecked");
+    }, { timeout: 1000 });
   });
+});
 
-  it("clicking Generate shows a loading state", async () => {
+describe("Report Generation — cancel behavior", () => {
+  it("clicking cancel calls onClose", async () => {
     const user = userEvent.setup();
-    await renderWithReportModal();
-    const generateBtn = document.querySelector("[data-testid='button-generate']") as Element ||
-      screen.queryByRole("button", { name: /^generate$/i });
-    if (generateBtn) {
-      await user.click(generateBtn);
-      await waitFor(() => {
-        const loadingState = screen.queryByText(/generating|loading|please wait/i) ||
-          document.querySelector("[aria-busy='true']");
-        expect(loadingState || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    const { onClose } = await renderReportModal("1", true);
+    await user.click(screen.getByTestId("button-cancel-report"));
+    expect(onClose).toHaveBeenCalled();
   });
+});
 
-  it("after generation completes a success message is shown", async () => {
+describe("Report Generation — submit and success", () => {
+  it("clicking Generate button triggers generating state", async () => {
     const user = userEvent.setup();
-    await renderWithReportModal();
-    const generateBtn = document.querySelector("[data-testid='button-generate']") as Element ||
-      screen.queryByRole("button", { name: /^generate$/i });
-    if (generateBtn) {
-      await user.click(generateBtn);
-      await waitFor(() => {
-        const success = screen.queryByText(/report generated|success|download/i);
-        expect(success || document.body).toBeTruthy();
-      }, { timeout: 4000 });
-    } else {
-      expect(true).toBe(true);
-    }
+    await renderReportModal("1", true);
+    await user.click(screen.getByTestId("button-generate"));
+    await waitFor(() => {
+      const btn = screen.queryByTestId("button-generate");
+      const isDisabled = btn?.hasAttribute("disabled");
+      const showingSuccess = screen.queryByTestId("report-success");
+      expect(isDisabled || showingSuccess).toBeTruthy();
+    }, { timeout: 2000 });
   });
 
-  it("section checkboxes can be toggled", async () => {
+  it("clicking Generate button eventually shows report-success state", async () => {
     const user = userEvent.setup();
-    await renderWithReportModal();
-    const eventLogCheckbox = document.querySelector("[data-testid='checkbox-event-log']") as HTMLInputElement ||
-      screen.queryByRole("checkbox", { name: /event log/i }) as HTMLInputElement;
-    if (eventLogCheckbox) {
-      const initial = eventLogCheckbox.checked;
-      await user.click(eventLogCheckbox);
-      expect(eventLogCheckbox.checked !== initial || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
+    await renderReportModal("1", true);
+    await user.click(screen.getByTestId("button-generate"));
+    await waitFor(() => {
+      expect(screen.getByTestId("report-success")).toBeInTheDocument();
+    }, { timeout: 3500 });
   });
 
-  it("all section checkboxes can be checked and unchecked", async () => {
+  it("report-success message contains success language", async () => {
     const user = userEvent.setup();
-    await renderWithReportModal();
-    const checkboxes = document.querySelectorAll("[data-testid^='checkbox-']") as NodeListOf<HTMLInputElement>;
-    for (const cb of checkboxes) {
-      const initial = cb.checked;
-      await user.click(cb);
-      await user.click(cb);
-      expect(cb.checked === initial || document.body).toBeTruthy();
-    }
-    expect(true).toBe(true);
+    await renderReportModal("1", true);
+    await user.click(screen.getByTestId("button-generate"));
+    await waitFor(() => {
+      const el = screen.getByTestId("report-success");
+      expect(el.textContent).toMatch(/Report generated|success|Download/i);
+    }, { timeout: 3500 });
   });
 
-  it("generate button is accessible", async () => {
-    await renderWithReportModal();
-    const btn = document.querySelector("[data-testid='button-generate']") ||
-      screen.queryByRole("button", { name: /^generate$/i });
-    if (btn) {
-      expect(btn.getAttribute("aria-disabled") !== "true" || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("the modal shows patient name in the header or title", async () => {
-    await renderWithReportModal();
-    const modalContent = document.querySelector("[data-testid='report-modal']") ||
-      screen.queryByRole("dialog");
-    expect(modalContent || document.body).toBeTruthy();
-  });
-
-  it("the report modal can be opened and closed multiple times", async () => {
+  it("can generate report for patient 2 (Marcus Tran)", async () => {
     const user = userEvent.setup();
-    const mockOnClose = vi.fn();
-    try {
-      const { ReportModal } = await import("../components/ReportModal");
-      const { rerender } = render(<ReportModal isOpen={true} onClose={mockOnClose} patientId="1" />);
-      const cancelBtn = document.querySelector("[data-testid='button-cancel-report']") as Element ||
-        screen.queryByRole("button", { name: /cancel/i });
-      if (cancelBtn) {
-        await user.click(cancelBtn);
-      }
-      rerender(<ReportModal isOpen={true} onClose={mockOnClose} patientId="1" />);
-      expect(document.body).toBeTruthy();
-    } catch {
-      expect(true).toBe(true);
-    }
+    await renderReportModal("2", true);
+    expect(screen.getByText(/Marcus Tran/)).toBeInTheDocument();
+    await user.click(screen.getByTestId("button-generate"));
+    await waitFor(() => {
+      expect(screen.getByTestId("report-success")).toBeInTheDocument();
+    }, { timeout: 3500 });
+  });
+
+  it("can generate report for patient 3 (Rosario Delgado)", async () => {
+    const user = userEvent.setup();
+    await renderReportModal("3", true);
+    await user.click(screen.getByTestId("button-generate"));
+    await waitFor(() => {
+      expect(screen.getByTestId("report-success")).toBeInTheDocument();
+    }, { timeout: 3500 });
+  });
+});
+
+describe("Report Generation — patient detail page integration", () => {
+  it("generate-report button is present on patient 1 detail page", async () => {
+    await renderPatientDetail("1");
+    expect(screen.getByTestId("button-generate-report")).toBeInTheDocument();
+  });
+
+  it("clicking button-generate-report opens the report modal", async () => {
+    await openReportModalFromPatientDetail("1");
+    expect(screen.getByTestId("report-modal")).toBeInTheDocument();
+  });
+
+  it("report modal opened from detail has checkboxes", async () => {
+    await openReportModalFromPatientDetail("1");
+    expect(screen.getByTestId("checkbox-summary")).toBeInTheDocument();
   });
 });

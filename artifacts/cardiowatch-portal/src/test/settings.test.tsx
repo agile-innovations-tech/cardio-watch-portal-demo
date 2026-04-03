@@ -1,254 +1,183 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 vi.mock("react-router-dom", () => ({
-  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useLocation: vi.fn(() => ({ pathname: "/settings", search: "", hash: "", state: null })),
   useNavigate: vi.fn(() => vi.fn()),
   useParams: vi.fn(() => ({ id: "1" })),
   useMatch: vi.fn(() => null),
-  Link: ({ children, to, href, onClick }) => (
+  Link: ({ children, to, href, onClick }: any) => (
     <a href={to || href} onClick={onClick}>{children}</a>
   ),
   Navigate: () => null,
-  MemoryRouter: ({ children }) => <>{children}</>,
-  Routes: ({ children }) => <>{children}</>,
-  Route: ({ element }) => <>{element}</>,
-  BrowserRouter: ({ children }) => <>{children}</>,
+  MemoryRouter: ({ children }: any) => <>{children}</>,
+  Routes: ({ children }: any) => <>{children}</>,
+  Route: ({ element }: any) => <>{element}</>,
+  BrowserRouter: ({ children }: any) => <>{children}</>,
 }));
 
-async function renderSettingsTab() {
-  try {
-    const { SettingsTab } = await import("../components/patient/SettingsTab");
-    return render(<SettingsTab patientId="1" />);
-  } catch {
-    try {
-      const { default: PatientDetail } = await import("../pages/patient-detail");
-      const result = render(<PatientDetail params={{ id: "1" }} />);
-      const settingsTab = document.querySelector("[data-testid='tab-settings']") ||
-        screen.queryByRole("tab", { name: /settings/i }) ||
-        screen.queryByText(/^settings$/i);
-      if (settingsTab) {
-        fireEvent.click(settingsTab as Element);
-      }
-      return result;
-    } catch {
-      const { default: App } = await import("../App");
-      return render(<App />);
-    }
-  }
+vi.mock("../lib/auth-context", async (importActual) => {
+  const actual = await importActual<typeof import("../lib/auth-context")>();
+  return {
+    ...actual,
+    useAuth: vi.fn(() => ({
+      role: "Clinician" as "Clinician" | "Admin",
+      setRole: vi.fn(),
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    })),
+  };
+});
+
+async function renderSettings() {
+  const { default: Settings } = await import("../pages/settings");
+  return render(<Settings />);
 }
 
-describe("Patient Settings Tab — rendering", () => {
-  it("Settings tab renders without crashing", async () => {
-    const { container } = await renderSettingsTab();
-    expect(container).toBeTruthy();
+async function renderSettingsAsAdmin() {
+  const authModule = await import("../lib/auth-context");
+  vi.mocked(authModule.useAuth).mockReturnValue({
+    role: "Admin",
+    setRole: vi.fn(),
+    isAuthenticated: true,
+    login: vi.fn(),
+    logout: vi.fn(),
+  });
+  const { default: Settings } = await import("../pages/settings");
+  return render(<Settings />);
+}
+
+beforeEach(() => {
+  vi.resetModules();
+});
+
+describe("Settings Page — rendering", () => {
+  it("settings page renders without crashing", async () => {
+    const { container } = await renderSettings();
+    expect(container.firstChild).not.toBeNull();
   });
 
-  it("bradycardia threshold field is present", async () => {
-    await renderSettingsTab();
-    const field = document.querySelector("[data-testid='input-brady-threshold']") ||
-      screen.queryByLabelText(/bradycardia|brady threshold/i);
-    expect(field || document.body).toBeTruthy();
+  it("Settings heading is present", async () => {
+    await renderSettings();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
-  it("bradycardia threshold field accepts numeric input", async () => {
+  it("user-profile-section is present", async () => {
+    await renderSettings();
+    expect(screen.getByTestId("user-profile-section")).toBeInTheDocument();
+  });
+
+  it("My Profile section heading is shown", async () => {
+    await renderSettings();
+    expect(screen.getByText(/My Profile/i)).toBeInTheDocument();
+  });
+});
+
+describe("Settings Page — notification toggles", () => {
+  it("in-app alerts toggle is present", async () => {
+    await renderSettings();
+    expect(screen.getByTestId("toggle-inapp-alerts")).toBeInTheDocument();
+  });
+
+  it("email alerts toggle is present", async () => {
+    await renderSettings();
+    expect(screen.getByTestId("toggle-email-alerts")).toBeInTheDocument();
+  });
+
+  it("SMS alerts toggle is present", async () => {
+    await renderSettings();
+    expect(screen.getByTestId("toggle-sms-alerts")).toBeInTheDocument();
+  });
+
+  it("in-app alerts toggle is checked by default", async () => {
+    await renderSettings();
+    const toggle = screen.getByTestId("toggle-inapp-alerts");
+    expect(toggle.getAttribute("data-state")).toBe("checked");
+  });
+
+  it("SMS alerts toggle is unchecked by default", async () => {
+    await renderSettings();
+    const toggle = screen.getByTestId("toggle-sms-alerts");
+    expect(toggle.getAttribute("data-state")).toBe("unchecked");
+  });
+
+  it("email alerts toggle is checked by default", async () => {
+    await renderSettings();
+    const toggle = screen.getByTestId("toggle-email-alerts");
+    expect(toggle.getAttribute("data-state")).toBe("checked");
+  });
+
+  it("clicking in-app toggle changes its state", async () => {
     const user = userEvent.setup();
-    await renderSettingsTab();
-    const field = document.querySelector("[data-testid='input-brady-threshold']") as HTMLInputElement;
-    if (field) {
-      await user.clear(field);
-      await user.type(field, "45");
-      expect(field.value).toContain("45");
-    } else {
-      expect(true).toBe(true);
-    }
+    await renderSettings();
+    const toggle = screen.getByTestId("toggle-inapp-alerts");
+    const stateBefore = toggle.getAttribute("data-state");
+    await user.click(toggle);
+    const stateAfter = toggle.getAttribute("data-state");
+    expect(stateAfter).not.toBe(stateBefore);
+  });
+});
+
+describe("Settings Page — clinician profile data", () => {
+  it("clinician name Okonkwo appears in input fields", async () => {
+    await renderSettings();
+    const allInputs = document.querySelectorAll("input");
+    const nameInput = Array.from(allInputs).find(i =>
+      i.value.includes("Okonkwo") || i.value.includes("Sarah")
+    );
+    expect(nameInput).toBeTruthy();
   });
 
-  it("bradycardia threshold field only accepts values in a clinical range", async () => {
-    await renderSettingsTab();
-    const field = document.querySelector("[data-testid='input-brady-threshold']") as HTMLInputElement;
-    if (field) {
-      const min = field.getAttribute("min");
-      const max = field.getAttribute("max");
-      expect(min !== null || max !== null || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
+  it("clinician email address is shown as an input value", async () => {
+    await renderSettings();
+    expect(screen.getByDisplayValue(/s\.okonkwo@northgate\.edu/i)).toBeInTheDocument();
   });
 
-  it("tachycardia threshold field is present", async () => {
-    await renderSettingsTab();
-    const field = document.querySelector("[data-testid='input-tachy-threshold']") ||
-      screen.queryByLabelText(/tachycardia|tachy threshold/i);
-    expect(field || document.body).toBeTruthy();
+  it("clinician role Attending Cardiologist appears", async () => {
+    await renderSettings();
+    const el = screen.queryByDisplayValue(/Attending Cardiologist/i) ||
+               screen.queryByText(/Attending Cardiologist/i);
+    expect(el).toBeTruthy();
+  });
+});
+
+describe("Settings Page — practice administration (Admin role)", () => {
+  it("practice-admin-section does NOT render for Clinician role", async () => {
+    await renderSettings();
+    expect(screen.queryByTestId("practice-admin-section")).not.toBeInTheDocument();
   });
 
-  it("tachycardia threshold field accepts numeric input", async () => {
-    const user = userEvent.setup();
-    await renderSettingsTab();
-    const field = document.querySelector("[data-testid='input-tachy-threshold']") as HTMLInputElement;
-    if (field) {
-      await user.clear(field);
-      await user.type(field, "110");
-      expect(field.value).toContain("110");
-    } else {
-      expect(true).toBe(true);
-    }
+  it("practice-admin-section DOES render for Admin role", async () => {
+    await renderSettingsAsAdmin();
+    expect(screen.getByTestId("practice-admin-section")).toBeInTheDocument();
   });
 
-  it("AF detection sensitivity dropdown is present", async () => {
-    await renderSettingsTab();
-    const dropdown = document.querySelector("[data-testid='select-af-sensitivity']") ||
-      screen.queryByLabelText(/af detection|af sensitivity/i);
-    expect(dropdown || document.body).toBeTruthy();
+  it("Practice Administration heading appears for Admin role", async () => {
+    await renderSettingsAsAdmin();
+    expect(screen.getByText(/Practice Administration/i)).toBeInTheDocument();
   });
 
-  it("AF sensitivity dropdown includes High, Standard, and Conservative options", async () => {
-    await renderSettingsTab();
-    const dropdown = document.querySelector("[data-testid='select-af-sensitivity']") as HTMLSelectElement;
-    if (dropdown) {
-      const options = Array.from(dropdown.options).map(o => o.text);
-      const hasHigh = options.some(o => /high/i.test(o));
-      const hasStandard = options.some(o => /standard/i.test(o));
-      const hasConservative = options.some(o => /conservative/i.test(o));
-      expect(hasHigh || hasStandard || hasConservative || options.length > 0 || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
+  it("invite user button is present for Admin role", async () => {
+    await renderSettingsAsAdmin();
+    expect(screen.getByTestId("button-invite-user")).toBeInTheDocument();
   });
 
-  it("pause detection threshold field is present", async () => {
-    await renderSettingsTab();
-    const field = document.querySelector("[data-testid='input-pause-threshold']") ||
-      screen.queryByLabelText(/pause detection|pause threshold/i);
-    expect(field || document.body).toBeTruthy();
+  it("user table shows Dr. James Ritter for Admin role", async () => {
+    await renderSettingsAsAdmin();
+    expect(screen.getByText(/Dr\. James Ritter/i)).toBeInTheDocument();
   });
 
-  it("caregiver escalation delay field is present", async () => {
-    await renderSettingsTab();
-    const field = document.querySelector("[data-testid='input-escalation-delay']") ||
-      screen.queryByLabelText(/escalation delay|escalation|delay/i);
-    expect(field || document.body).toBeTruthy();
+  it("user table shows Jennifer Calás for Admin role", async () => {
+    await renderSettingsAsAdmin();
+    const el = screen.queryByText(/Jennifer Cal/i);
+    expect(el).toBeTruthy();
   });
 
-  it("Emergency Escalation toggle is present", async () => {
-    await renderSettingsTab();
-    const toggle = document.querySelector("[data-testid='toggle-emergency']") ||
-      screen.queryByLabelText(/emergency escalation/i);
-    expect(toggle || document.body).toBeTruthy();
-  });
-
-  it("Emergency Escalation toggle is checkable", async () => {
-    const user = userEvent.setup();
-    await renderSettingsTab();
-    const toggle = document.querySelector("[data-testid='toggle-emergency']") as HTMLInputElement;
-    if (toggle) {
-      const initial = toggle.checked;
-      await user.click(toggle);
-      expect(toggle.checked !== initial || document.body).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("Monitoring Paused toggle is present", async () => {
-    await renderSettingsTab();
-    const toggle = document.querySelector("[data-testid='toggle-monitoring-paused']") ||
-      screen.queryByLabelText(/monitoring paused|pause monitoring/i);
-    expect(toggle || document.body).toBeTruthy();
-  });
-
-  it("enabling Monitoring Paused toggle reveals the resume date field", async () => {
-    const user = userEvent.setup();
-    await renderSettingsTab();
-    const toggle = document.querySelector("[data-testid='toggle-monitoring-paused']") as Element;
-    if (toggle) {
-      await user.click(toggle);
-      await waitFor(() => {
-        const resumeDateField = document.querySelector("[data-testid='input-resume-date']") ||
-          screen.queryByLabelText(/resume date/i);
-        expect(resumeDateField || document.body).toBeTruthy();
-      }, { timeout: 2000 });
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("Save Changes button is present", async () => {
-    await renderSettingsTab();
-    const saveBtn = document.querySelector("[data-testid='button-save-settings']") ||
-      screen.queryByRole("button", { name: /save changes|save/i });
-    expect(saveBtn || document.body).toBeTruthy();
-  });
-
-  it("clicking Save Changes shows a success toast or notification", async () => {
-    const user = userEvent.setup();
-    await renderSettingsTab();
-    const saveBtn = document.querySelector("[data-testid='button-save-settings']") as Element ||
-      screen.queryByRole("button", { name: /save changes|save/i });
-    if (saveBtn) {
-      await user.click(saveBtn);
-      await waitFor(() => {
-        const toast = document.querySelector("[data-testid='toast-success']") ||
-          screen.queryByText(/saved|settings updated|changes saved|success/i);
-        expect(toast || document.body).toBeTruthy();
-      }, { timeout: 3000 });
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("the form pre-populates with the patient's current thresholds", async () => {
-    await renderSettingsTab();
-    const bradyField = document.querySelector("[data-testid='input-brady-threshold']") as HTMLInputElement;
-    if (bradyField) {
-      expect(bradyField.value).toBeTruthy();
-    } else {
-      expect(true).toBe(true);
-    }
-  });
-
-  it("invalid threshold values cannot be submitted", async () => {
-    const user = userEvent.setup();
-    await renderSettingsTab();
-    const bradyField = document.querySelector("[data-testid='input-brady-threshold']") as HTMLInputElement;
-    if (bradyField) {
-      await user.clear(bradyField);
-      await user.type(bradyField, "200");
-    }
-    const saveBtn = document.querySelector("[data-testid='button-save-settings']") as Element ||
-      screen.queryByRole("button", { name: /save changes|save/i });
-    if (saveBtn) {
-      await user.click(saveBtn);
-    }
-    expect(true).toBe(true);
-  });
-
-  it("the resume date picker accepts a valid future date", async () => {
-    const user = userEvent.setup();
-    await renderSettingsTab();
-    const pauseToggle = document.querySelector("[data-testid='toggle-monitoring-paused']") as Element;
-    if (pauseToggle) {
-      await user.click(pauseToggle);
-      const dateInput = document.querySelector("[data-testid='input-resume-date']") as HTMLInputElement;
-      if (dateInput) {
-        fireEvent.change(dateInput, { target: { value: "2026-12-31" } });
-        expect(dateInput.value || "2026-12-31").toBeTruthy();
-      }
-    }
-    expect(true).toBe(true);
-  });
-
-  it("the settings form is accessible with proper ARIA labels", async () => {
-    await renderSettingsTab();
-    const labeledInputs = document.querySelectorAll("input[aria-label], input[id]");
-    expect(labeledInputs.length >= 0 || document.body).toBeTruthy();
-  });
-
-  it("the settings fields have visible labels", async () => {
-    await renderSettingsTab();
-    const labels = document.querySelectorAll("label");
-    expect(labels.length >= 0 || document.body).toBeTruthy();
+  it("Northgate Cardiac Institute input appears in Admin view", async () => {
+    await renderSettingsAsAdmin();
+    expect(screen.getByDisplayValue(/Northgate Cardiac Institute/i)).toBeInTheDocument();
   });
 });
