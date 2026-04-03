@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "CardioWatch AI Clinician Portal"
+version = "1.0.0"
+id = "artifacts/cardiowatch-portal"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22997
+
+[services.development]
+run = "pnpm --filter @workspace/cardiowatch-portal run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/cardiowatch-portal", "run", "build" ]
+publicDir = "artifacts/cardiowatch-portal/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22997"
+BASE_PATH = "/"
