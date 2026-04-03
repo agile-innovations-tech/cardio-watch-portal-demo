@@ -2,18 +2,20 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-vi.mock("wouter", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useLocation: vi.fn(() => ["/dashboard", vi.fn()]),
-    useParams: vi.fn(() => ({ id: "1" })),
-    useRoute: vi.fn(() => [false, {}]),
-    Link: ({ children, href, onClick }: { children: React.ReactNode; href?: string; onClick?: () => void }) => (
-      <a href={href} onClick={onClick}>{children}</a>
-    ),
-  };
-});
+vi.mock("react-router-dom", () => ({
+  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useNavigate: vi.fn(() => vi.fn()),
+  useParams: vi.fn(() => ({ id: "1" })),
+  useMatch: vi.fn(() => null),
+  Link: ({ children, to, href, onClick }) => (
+    <a href={to || href} onClick={onClick}>{children}</a>
+  ),
+  Navigate: () => null,
+  MemoryRouter: ({ children }) => <>{children}</>,
+  Routes: ({ children }) => <>{children}</>,
+  Route: ({ element }) => <>{element}</>,
+  BrowserRouter: ({ children }) => <>{children}</>,
+}));
 
 async function renderSettingsTab() {
   try {

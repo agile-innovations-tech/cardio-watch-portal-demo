@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Link } from 'wouter';
+import { Link } from 'react-router-dom';
 import { X, CheckCheck } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,7 @@ export function NotificationDrawer({ open, onOpenChange, notifications, setNotif
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex-1 space-y-1">
                       {notif.link ? (
-                        <Link href={notif.link} onClick={() => onOpenChange(false)}>
+                        <Link to={notif.link} onClick={() => onOpenChange(false)}>
                           <div className="text-sm font-medium cursor-pointer hover:underline text-foreground">
                             {notif.message}
                           </div>

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Activity, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
-  const [location] = useLocation();
+  const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
   const navItems = [
@@ -39,9 +39,9 @@ export function Sidebar() {
 
       <nav className="flex-1 py-4 flex flex-col gap-1 px-2">
         {navItems.map((item) => {
-          const isActive = location === item.path || (location === '/' && item.path === '/dashboard');
+          const isActive = pathname === item.path || (pathname === '/' && item.path === '/dashboard');
           return (
-            <Link key={item.name} href={item.path} className="block">
+            <Link key={item.name} to={item.path} className="block">
               <div
                 data-testid={item.testId}
                 className={cn(

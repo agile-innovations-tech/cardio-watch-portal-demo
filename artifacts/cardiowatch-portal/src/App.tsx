@@ -1,5 +1,5 @@
 import React from 'react';
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,52 +16,69 @@ import Settings from "@/pages/settings";
 
 const queryClient = new QueryClient();
 
-type PageComponent = React.ComponentType<{ params?: Record<string, string> }>;
-
-function ProtectedRoute({ component: Component, path }: { component: PageComponent; path: string }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  return (
-    <Route path={path}>
-      {(params) =>
-        isAuthenticated ? (
-          <Layout>
-            <Component params={params} />
-          </Layout>
-        ) : (
-          <Redirect to="/login" />
-        )
-      }
-    </Route>
-  );
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function Router() {
   const { isAuthenticated } = useAuth();
   return (
-    <Switch>
-      <Route path="/login">
-        {isAuthenticated ? <Redirect to="/dashboard" /> : <Login />}
-      </Route>
-      <Route path="/">
-        {isAuthenticated ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
-      </Route>
-      <ProtectedRoute path="/dashboard" component={Dashboard} />
-      <ProtectedRoute path="/patients/:id" component={PatientDetail} />
-      <ProtectedRoute path="/analytics" component={Analytics} />
-      <ProtectedRoute path="/settings" component={Settings} />
-      <Route component={NotFound} />
-    </Switch>
+    <Routes>
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
+      />
+      <Route
+        path="/"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Layout><Dashboard /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patients/:id"
+        element={
+          <ProtectedRoute>
+            <Layout><PatientDetail /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <Layout><Analytics /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Layout><Settings /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 }
 
 function App() {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <BrowserRouter basename={base}>
             <Router />
-          </WouterRouter>
+          </BrowserRouter>
           <Toaster position="top-right" />
         </AuthProvider>
       </TooltipProvider>

@@ -2,15 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-vi.mock("wouter", () => ({
-  useLocation: vi.fn(() => ["/dashboard", vi.fn()]),
-  Link: ({ children, href, onClick }: { children: React.ReactNode; href?: string; onClick?: () => void }) => (
-    <a href={href} onClick={onClick}>{children}</a>
+vi.mock("react-router-dom", () => ({
+  useLocation: vi.fn(() => ({ pathname: "/dashboard", search: "", hash: "", state: null })),
+  useNavigate: vi.fn(() => vi.fn()),
+  useParams: vi.fn(() => ({ id: "1" })),
+  useMatch: vi.fn(() => null),
+  Link: ({ children, to, href, onClick }) => (
+    <a href={to || href} onClick={onClick}>{children}</a>
   ),
-  Route: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  Switch: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  Router: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useRoute: vi.fn(() => [false, {}]),
+  Navigate: () => null,
+  MemoryRouter: ({ children }) => <>{children}</>,
+  Routes: ({ children }) => <>{children}</>,
+  Route: ({ element }) => <>{element}</>,
+  BrowserRouter: ({ children }) => <>{children}</>,
 }));
 
 async function renderDashboard() {

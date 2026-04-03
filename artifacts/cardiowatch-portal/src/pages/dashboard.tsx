@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'wouter';
+import { Link } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Search, Filter, AlertTriangle, Activity, CheckCircle, Clock } from 'lucide-react';
 import { patients } from '@/data/patients';
@@ -212,7 +212,7 @@ export default function Dashboard() {
                         {formatDistanceToNow(new Date(patient.lastReviewed), { addSuffix: true })}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/patients/${patient.id}`}>
+                        <Link to={`/patients/${patient.id}`}>
                           <Button size="sm" variant="secondary" data-testid={`button-review-${patient.id}`}>
                             Review
                           </Button>

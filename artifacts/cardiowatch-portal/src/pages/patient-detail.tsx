@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useLocation } from 'wouter';
+import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { FileText, SlidersHorizontal, MessageSquare, Battery, Activity, ShieldAlert, CheckCircle, Search, Filter, CalendarDays, X, ZoomIn, ZoomOut, Maximize, Clock, Settings as SettingsIcon } from 'lucide-react';
 import { patients } from '@/data/patients';
@@ -26,9 +26,10 @@ import { TrendsTab } from '@/components/patient/trends-tab';
 import { HistoryTab } from '@/components/patient/history-tab';
 import { SettingsTab } from '@/components/patient/settings-tab';
 
-export default function PatientDetail({ params }: { params: { id: string } }) {
-  const [, setLocation] = useLocation();
-  const patientId = params.id;
+export default function PatientDetail({ params }: { params?: { id?: string } } = {}) {
+  const navigate = useNavigate();
+  const routerParams = useParams<{ id: string }>();
+  const patientId = params?.id ?? routerParams.id ?? '1';
   const patient = patients.find(p => p.id === patientId);
   const [activeTab, setActiveTab] = useState('events');
   const [reportModalOpen, setReportModalOpen] = useState(false);
