@@ -1,5 +1,5 @@
 import React from 'react';
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,23 +16,35 @@ import Settings from "@/pages/settings";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ component: Component, path }: { component: any, path: string }) {
+type PageComponent = React.ComponentType<{ params?: Record<string, string> }>;
+
+function ProtectedRoute({ component: Component, path }: { component: PageComponent; path: string }) {
+  const { isAuthenticated } = useAuth();
   return (
     <Route path={path}>
-      {(params) => (
-        <Layout>
-          <Component params={params} />
-        </Layout>
-      )}
+      {(params) =>
+        isAuthenticated ? (
+          <Layout>
+            <Component params={params} />
+          </Layout>
+        ) : (
+          <Redirect to="/login" />
+        )
+      }
     </Route>
   );
 }
 
 function Router() {
+  const { isAuthenticated } = useAuth();
   return (
     <Switch>
-      <Route path="/login" component={Login} />
-      <ProtectedRoute path="/" component={Dashboard} />
+      <Route path="/login">
+        {isAuthenticated ? <Redirect to="/dashboard" /> : <Login />}
+      </Route>
+      <Route path="/">
+        {isAuthenticated ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
+      </Route>
       <ProtectedRoute path="/dashboard" component={Dashboard} />
       <ProtectedRoute path="/patients/:id" component={PatientDetail} />
       <ProtectedRoute path="/analytics" component={Analytics} />

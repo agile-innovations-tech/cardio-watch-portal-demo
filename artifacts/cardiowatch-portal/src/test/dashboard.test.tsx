@@ -56,7 +56,7 @@ describe("Patient Population Dashboard — rendering", () => {
   it("panel compliance rate is displayed", async () => {
     await renderDashboard();
     const compliance = document.querySelector("[data-testid='stat-compliance']") ||
-      screen.queryByText(/91%|compliance/i);
+      (screen.queryAllByText(/91%|compliance/i)[0] ?? null);
     expect(compliance || document.body).toBeTruthy();
   });
 

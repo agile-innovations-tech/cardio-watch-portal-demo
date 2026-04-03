@@ -161,7 +161,7 @@ export function EventsTab({ events, onStatusChange, onViewEcg }: EventsTabProps)
                         {RHYTHM_LABELS.map(label => (
                           <DropdownMenuItem 
                             key={label} 
-                            onClick={() => onStatusChange(event.id, 'Reclassified', label as any)}
+                            onClick={() => onStatusChange(event.id, 'Reclassified', label)}
                           >
                             {label}
                           </DropdownMenuItem>

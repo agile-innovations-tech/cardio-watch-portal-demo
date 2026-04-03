@@ -15,7 +15,7 @@ export const getPatientHistory = (patientId: string): HistoryEntry[] => {
       'Patient reported symptoms: Palpitations',
       'System alert: Battery below 15%'
     ][Math.floor(Math.random() * 7)],
-    type: (['Clinician', 'System', 'Patient', 'Clinician'][Math.floor(Math.random() * 4)]) as any
+    type: (['Clinician', 'System', 'Patient', 'Clinician'] as const)[Math.floor(Math.random() * 4)]
   }));
 };
 
