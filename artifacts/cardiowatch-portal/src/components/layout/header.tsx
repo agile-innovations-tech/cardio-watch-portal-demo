@@ -8,7 +8,7 @@ import { NotificationDrawer } from './notification-drawer';
 import { notifications as initialNotifications } from '@/data/notifications';
 
 export function Header() {
-  const { role, setRole } = useAuth();
+  const { role, setRole, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState(initialNotifications);
 
@@ -59,7 +59,7 @@ export function Header() {
               Switch to {role === 'Clinician' ? 'Admin' : 'Clinician'} View
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Sign Out</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={logout}>Sign Out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
