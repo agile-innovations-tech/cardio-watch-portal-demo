@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --reporter=verbose --reporter=junit --outputFile=test-results/junit.xml",
     "test:watch": "vitest",
-    "test:e2e": "LD_LIBRARY_PATH=\"/nix/store/24w3s75aa2lrvvxsybficn8y3zxd27kp-mesa-libgbm-25.1.0/lib:$REPLIT_LD_LIBRARY_PATH\" playwright test",
+    "test:e2e": "LD_LIBRARY_PATH=\"/nix/store/24w3s75aa2lrvvxsybficn8y3zxd27kp-mesa-libgbm-25.1.0/lib:$REPLIT_LD_LIBRARY_PATH\" playwright test && node e2e/postprocess-junit.mjs",
     "test:e2e:headed": "LD_LIBRARY_PATH=\"/nix/store/24w3s75aa2lrvvxsybficn8y3zxd27kp-mesa-libgbm-25.1.0/lib:$REPLIT_LD_LIBRARY_PATH\" playwright test --headed",
     "test:e2e:report": "playwright show-report"
   },
