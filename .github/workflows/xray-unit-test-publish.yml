@@ -1,4 +1,4 @@
-name: Run unit tests and publish to Xray
+name: Run tests and publish to Xray
 
 on:
   workflow_dispatch:
@@ -30,6 +30,11 @@ jobs:
         id: unit_tests
         continue-on-error: true
         run: pnpm --filter @workspace/cardiowatch-portal run test
+
+      - name: Run e2e tests
+        id: e2e_tests
+        continue-on-error: true
+        run: pnpm --filter @workspace/cardiowatch-portal run test:e2e
 
       - name: Verify JUnit results file exists
         run: |
