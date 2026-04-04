@@ -37,6 +37,7 @@ CardioWatch AI is a simulated clinician-facing dashboard for reviewing AI-detect
 - **Wouter** (client-side routing)
 - **Recharts** (trend charts and analytics visualizations)
 - **Vitest** + **React Testing Library** (unit + integration tests)
+- **Playwright** (end-to-end UI tests)
 
 ---
 
@@ -105,7 +106,17 @@ This runs all 389 tests and outputs a JUnit XML report at:
 artifacts/cardiowatch-portal/test-results/junit.xml
 ```
 
-The XML report is compatible with **Xray for Jira** and any standard CI/CD JUnit consumer.
+### Run Playwright tests
+
+```bash
+pnpm --filter @workspace/cardiowatch-portal run test:e2e
+```
+
+This runs all 37 Playwright end-to-end tests in `artifacts/cardiowatch-portal/e2e/` and writes a JUnit XML report at:
+
+```
+artifacts/cardiowatch-portal/test-results/e2e/junit.xml
+```
 
 ### Build for production
 
@@ -138,6 +149,29 @@ pnpm --filter @workspace/cardiowatch-portal run build
 | `data-integrity.test.ts` | Data shape validation for all dummy data files |
 
 JUnit XML output is written automatically on every test run to `test-results/junit.xml`.
+
+---
+
+## Playwright E2E Coverage
+
+37 tests across 14 test files:
+
+| Test File | Coverage Area |
+|---|---|
+| `e2e/tc01-auth.spec.ts` | Login validation, protected routes, sign out |
+| `e2e/tc02-dashboard.spec.ts` | KPI cards, patient table, deterministic sorting |
+| `e2e/tc03-filtering.spec.ts` | Search, severity/status filters, empty state |
+| `e2e/tc04-navigation.spec.ts` | Review button navigation to patient detail |
+| `e2e/tc05-events.spec.ts` | Confirm, dismiss, reclassify, undo, filtering |
+| `e2e/tc06-ecg-viewer.spec.ts` | ECG waveform, speed/gain, annotations, zoom |
+| `e2e/tc07-trends.spec.ts` | Trends charts |
+| `e2e/tc08-history.spec.ts` | Audit log |
+| `e2e/tc09-patient-settings.spec.ts` | Threshold controls |
+| `e2e/tc10-report.spec.ts` | Report modal open, cancel, submit |
+| `e2e/tc11-notifications.spec.ts` | Notification drawer open/close |
+| `e2e/tc12-sidebar-nav.spec.ts` | Sidebar links |
+| `e2e/tc13-analytics.spec.ts` | Analytics metrics + charts |
+| `e2e/tc14-app-settings.spec.ts` | Settings profile section + toggles |
 
 ---
 
