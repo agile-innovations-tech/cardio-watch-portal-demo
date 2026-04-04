@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { login, getFirstPatientId } from './helpers';
 
 test.describe('TC-05 — Event Adjudication (UR-04)', () => {
@@ -12,7 +12,7 @@ test.describe('TC-05 — Event Adjudication (UR-04)', () => {
     await expect(page.locator('[data-testid^="event-card-"]').first()).toBeVisible();
   });
 
-  async function getFirstUnreviewedEventId(page: any): Promise<string> {
+  async function getFirstUnreviewedEventId(page: Page): Promise<string> {
     const allCards = page.locator('[data-testid^="event-card-"]');
     const count = await allCards.count();
     for (let i = 0; i < count; i++) {

@@ -19,6 +19,12 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
+  webServer: {
+    command: `PORT=${port} pnpm dev`,
+    url: baseURL,
+    reuseExistingServer: true,
+    timeout: 60_000,
+  },
   projects: [
     {
       name: 'chromium',
