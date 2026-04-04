@@ -37,10 +37,26 @@ test.describe('TC-05 — Event Adjudication (UR-04)', () => {
   test('TC-05.2 — Event cards show classification, timestamp, confidence, and status', async ({ page }) => {
     const firstCard = page.locator('[data-testid^="event-card-"]').first();
     await expect(firstCard).toBeVisible();
+
     await expect(firstCard.locator('h3')).toBeVisible();
 
-    const cardText = await firstCard.innerText();
-    expect(cardText.length).toBeGreaterThan(0);
+    const timestampEl = firstCard.locator('.font-mono').first();
+    await expect(timestampEl).toBeVisible();
+    const timestampText = await timestampEl.innerText();
+    expect(timestampText).toMatch(/\w{3}\s+\d+,\s+\d{4}/);
+
+    await expect(firstCard.getByText('Confidence')).toBeVisible();
+    const confidenceParent = firstCard.locator('p').filter({ hasText: 'Confidence' }).locator('..');
+    await expect(confidenceParent).toBeVisible();
+    const confidenceText = await confidenceParent.innerText();
+    expect(confidenceText).toMatch(/\d+%/);
+
+    const statusTexts = ['Unreviewed', 'Confirmed', 'Dismissed', 'Reclassified'];
+    const hasStatus = await firstCard.evaluate(
+      (el, statuses) => statuses.some(s => el.textContent?.includes(s)),
+      statusTexts,
+    );
+    expect(hasStatus).toBe(true);
   });
 
   test('TC-05.3 — Confirming an unreviewed event changes its status to Confirmed', async ({ page }) => {

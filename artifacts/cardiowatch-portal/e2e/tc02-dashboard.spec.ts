@@ -39,28 +39,24 @@ test.describe('TC-02 — Population Dashboard (UR-02)', () => {
     await expect(header.getByText('Action')).toBeVisible();
   });
 
-  test('TC-02.3 — Column sorting changes row order', async ({ page }) => {
+  test('TC-02.3 — Column sorting produces correct descending then ascending order', async ({ page }) => {
     await login(page);
 
-    const firstRowBefore = await page
-      .locator('[data-testid="patient-table"] tbody tr:first-child td:first-child')
-      .innerText();
+    await page.locator('[data-testid="sort-name"]').click();
+
+    const rowsDesc = page.locator('[data-testid="patient-table"] tbody tr');
+    const firstDesc = (await rowsDesc.nth(0).locator('td:first-child').innerText()).trim();
+    const secondDesc = (await rowsDesc.nth(1).locator('td:first-child').innerText()).trim();
+    expect(firstDesc.toLowerCase() >= secondDesc.toLowerCase()).toBeTruthy();
 
     await page.locator('[data-testid="sort-name"]').click();
 
-    const firstRowAfter = await page
-      .locator('[data-testid="patient-table"] tbody tr:first-child td:first-child')
-      .innerText();
+    const rowsAsc = page.locator('[data-testid="patient-table"] tbody tr');
+    const firstAsc = (await rowsAsc.nth(0).locator('td:first-child').innerText()).trim();
+    const secondAsc = (await rowsAsc.nth(1).locator('td:first-child').innerText()).trim();
+    expect(firstAsc.toLowerCase() <= secondAsc.toLowerCase()).toBeTruthy();
 
-    expect(firstRowAfter.toLowerCase() <= firstRowBefore.toLowerCase() || firstRowAfter !== firstRowBefore).toBeTruthy();
-
-    await page.locator('[data-testid="sort-name"]').click();
-
-    const firstRowDesc = await page
-      .locator('[data-testid="patient-table"] tbody tr:first-child td:first-child')
-      .innerText();
-
-    expect(firstRowDesc).not.toEqual(firstRowAfter);
+    expect(firstDesc).not.toEqual(firstAsc);
   });
 
 });
