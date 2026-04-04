@@ -10,21 +10,32 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
+
   reporter: [
     ['list'],
-    ['junit', { outputFile: './test-results/e2e/junit.xml' }],
+    [
+      '@xray-app/playwright-junit-reporter',
+      {
+        outputFile: './test-results/e2e/junit.xml',
+        embedAnnotationsAsProperties: true,
+        embedAttachmentsAsProperty: 'testrun_evidence',
+      },
+    ],
   ],
+
   use: {
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
+
   webServer: {
     command: `PORT=${port} pnpm dev`,
     url: baseURL,
     reuseExistingServer: true,
     timeout: 60_000,
   },
+
   projects: [
     {
       name: 'chromium',
